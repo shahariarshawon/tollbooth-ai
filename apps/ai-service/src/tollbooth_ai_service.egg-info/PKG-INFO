@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: tollbooth-ai-service
+Version: 0.0.0
+Summary: AI processing service: PII detection, prompt analysis and embeddings
+Requires-Python: >=3.12
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.32
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: httpx>=0.27; extra == "dev"
+Requires-Dist: ruff>=0.8; extra == "dev"

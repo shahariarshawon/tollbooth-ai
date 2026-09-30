@@ -1,0 +1,25 @@
+{
+  "name": "@tollbooth/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Next.js dashboard for tenant admins, developers and finance teams",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --port 3002",
+    "start": "next start --port 3002",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "next": "^16.3.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3"
+  }
+}

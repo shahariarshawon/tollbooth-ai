@@ -1,0 +1,25 @@
+[project]
+name = "tollbooth-ai-service"
+version = "0.0.0"
+description = "AI processing service: PII detection, prompt analysis and embeddings"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,29 @@
+{
+  "name": "@tollbooth/control-plane",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Management backend: tenants, users, keys, budgets and policies",
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ]
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-express": "^11.2.7",
+    "@tollbooth/config": "workspace:*",
+    "@tollbooth/shared": "workspace:*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  }
+}
