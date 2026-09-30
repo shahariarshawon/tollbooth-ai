@@ -23,6 +23,9 @@ jobs:
       - run: pnpm --filter "./packages/*" build
       - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm db:validate

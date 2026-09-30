@@ -73,7 +73,11 @@ cp .env.example .env          # then set JWT_SECRET (e.g. openssl rand -base64 4
 # 3. Start infrastructure
 pnpm infra:up
 
-# 4. Run services (each in its own terminal)
+# 4. Create the database schema and development data
+pnpm db:migrate
+pnpm db:seed
+
+# 5. Run services (each in its own terminal)
 pnpm --filter @tollbooth/gateway dev          # PORT is read from .env
 pnpm --filter @tollbooth/control-plane dev
 pnpm --filter @tollbooth/worker dev
@@ -111,6 +115,11 @@ docker compose ps             # all services should become "healthy"
 docker compose down           # stop (data is kept)
 docker compose down -v        # stop and delete all data
 ```
+
+If a host port is already taken (for example a local Postgres on 5432 or Redis on 6379), set
+`POSTGRES_PORT` or `REDIS_PORT` in `.env` and update `DATABASE_URL` or `REDIS_URL` to match.
+
+Database design, commands and seed data: [docs/database/database-design.md](docs/database/database-design.md).
 
 Credentials in `docker-compose.yml` are development defaults, overridable through `.env`. Never
 reuse them outside local development.

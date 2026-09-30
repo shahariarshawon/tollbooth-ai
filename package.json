@@ -10,13 +10,20 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "lint": "eslint .",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:db",
     "test": "pnpm -r --if-present test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "typecheck:db": "tsc -p prisma/tsconfig.json --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,7 +37,15 @@
     "prettier": "^3.9.9",
     "prisma": "6.19.3",
     "ts-jest": "^29.4.14",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
   }
 }
