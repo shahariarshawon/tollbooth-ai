@@ -39,6 +39,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      # Builds every app, including the Next.js dashboard, to catch compile errors tests do not.
+      - run: pnpm build
       - run: pnpm db:validate
       - run: pnpm db:deploy
       - run: pnpm --filter @tollbooth/control-plane test:e2e

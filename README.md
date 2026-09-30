@@ -6,8 +6,9 @@ Tollbooth AI sits between your applications and AI providers (OpenAI, Anthropic,
 controls who can use which model, tracks tokens and cost, enforces budgets, falls back between
 providers when one fails, and screens prompts for sensitive data.
 
-> **Status: Phase 2 complete.** Foundation, database, and the control plane with authentication, RBAC
-> and tenant isolation are in place. The gateway, worker and dashboard are still skeletons.
+> **Status: Phase 3 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
+> isolation) and the dashboard UI are in place. The gateway and worker are still skeletons, and the
+> dashboard shows sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
 
@@ -81,7 +82,7 @@ pnpm db:seed
 pnpm --filter @tollbooth/gateway dev          # PORT is read from .env
 pnpm --filter @tollbooth/control-plane dev
 pnpm --filter @tollbooth/worker dev
-pnpm --filter @tollbooth/dashboard dev        # http://localhost:3002
+pnpm --filter @tollbooth/dashboard dev        # http://localhost:3002 (sign in: admin@techcorp.com)
 ```
 
 The control plane (authentication, users, tenants) runs on the port you give it and reads `.env` in
@@ -136,12 +137,13 @@ reuse them outside local development.
 1. **Phase 0**: foundation, monorepo, infrastructure (done)
 2. **Phase 1**: database schema, Prisma, migrations, seed (done)
 3. **Phase 2**: authentication, RBAC, tenant isolation, user and tenant management (done)
-4. **Phase 3**: API key management
-5. **Phase 4**: gateway core, provider adapters, routing and fallback
-6. **Phase 5**: rate limiting, budget enforcement and usage tracking
-7. **Phase 6**: Kafka event pipeline and workers
-8. **Phase 7**: AI security layer (PII detection, prompt filtering)
-9. **Phase 8**: analytics dashboard
-10. **Phase 9**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
+4. **Phase 3**: dashboard frontend (done): [docs/frontend/dashboard-guide.md](docs/frontend/dashboard-guide.md)
+5. **Phase 4**: projects and API key management (backend)
+6. **Phase 5**: gateway core, provider adapters, routing and fallback
+7. **Phase 6**: rate limiting, budget enforcement and usage tracking
+8. **Phase 7**: Kafka event pipeline and workers
+9. **Phase 8**: AI security layer (PII detection, prompt filtering)
+10. **Phase 9**: analytics dashboard
+11. **Phase 10**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.

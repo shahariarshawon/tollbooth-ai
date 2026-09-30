@@ -169,7 +169,7 @@ Access tokens are HS256 JWTs signed with `JWT_SECRET`.
 ## RBAC
 
 Roles are a column on the user. Each role maps to a fixed set of permissions in
-`apps/control-plane/src/roles/permission.ts`.
+`packages/shared/src/permissions.ts` (re-exported by `apps/control-plane/src/roles/permission.ts`).
 
 Permissions:
 
@@ -196,6 +196,8 @@ Matrix:
 | `USER_CREATE`     |      x      |      x       |           |         |
 | `USER_UPDATE`     |      x      |      x       |           |         |
 | `USER_DELETE`     |      x      |      x       |           |         |
+| `PROJECT_READ`    |      x      |      x       |     x     |    x    |
+| `PROJECT_MANAGE`  |      x      |      x       |     x     |         |
 | `API_KEY_CREATE`  |      x      |      x       |     x     |         |
 | `API_KEY_DELETE`  |      x      |      x       |     x     |         |
 | `VIEW_ANALYTICS`  |      x      |      x       |     x     |    x    |
