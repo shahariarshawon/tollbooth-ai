@@ -38,7 +38,9 @@ async function seedProviders() {
 async function seedModels(providers: Map<ProviderType, string>) {
   // Prices are USD per 1,000,000 tokens and are development values, not a price list.
   const models = [
+    { type: ProviderType.OPENAI, modelName: 'gpt-4', input: '30.00', output: '60.00' },
     { type: ProviderType.OPENAI, modelName: 'gpt-4o', input: '2.50', output: '10.00' },
+    { type: ProviderType.OPENAI, modelName: 'gpt-4o-mini', input: '0.15', output: '0.60' },
     {
       type: ProviderType.ANTHROPIC,
       modelName: 'claude-sonnet-4-5',

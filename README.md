@@ -6,9 +6,9 @@ Tollbooth AI sits between your applications and AI providers (OpenAI, Anthropic,
 controls who can use which model, tracks tokens and cost, enforces budgets, falls back between
 providers when one fails, and screens prompts for sensitive data.
 
-> **Status: Phase 3 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
-> isolation) and the dashboard UI are in place. The gateway and worker are still skeletons, and the
-> dashboard shows sample data for projects, API keys and usage until their backends exist.
+> **Status: Phase 4 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
+> isolation), the dashboard and the OpenAI-compatible gateway core are in place. The dashboard shows
+> sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
 
@@ -45,7 +45,7 @@ for the full design.
 
 ```
 apps/
-  gateway/         NestJS API gateway (port 3000)
+  gateway/         OpenAI-compatible LLM gateway, NestJS (port 3000)
   control-plane/   NestJS management backend (port 3001)
   dashboard/       Next.js frontend (port 3002)
   worker/          Background workers (port 3003, health only)
@@ -92,6 +92,9 @@ development. After `pnpm db:seed` you can sign in as `admin@techcorp.com` with `
 All Node services read the same `PORT` variable. When running several at once, override it per
 process, for example `PORT=3001 pnpm --filter @tollbooth/control-plane dev`.
 
+The gateway serves `POST /v1/chat/completions`. Set `OPENAI_API_KEY` in `.env`, then
+`pnpm gateway:test` sends a request through it; see [docs/api/gateway-api.md](docs/api/gateway-api.md).
+
 To run the AI service, see [apps/ai-service/README.md](apps/ai-service/README.md).
 
 Quality checks:
@@ -99,8 +102,9 @@ Quality checks:
 ```bash
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
 
-# Integration tests: run the control plane against the real Postgres from docker compose
+# Integration tests against the real Postgres from docker compose
 pnpm --filter @tollbooth/control-plane test:e2e
+pnpm --filter @tollbooth/gateway test:e2e     # uses a local fake OpenAI, no API key needed
 ```
 
 ## Docker setup
@@ -138,12 +142,12 @@ reuse them outside local development.
 2. **Phase 1**: database schema, Prisma, migrations, seed (done)
 3. **Phase 2**: authentication, RBAC, tenant isolation, user and tenant management (done)
 4. **Phase 3**: dashboard frontend (done): [docs/frontend/dashboard-guide.md](docs/frontend/dashboard-guide.md)
-5. **Phase 4**: projects and API key management (backend)
-6. **Phase 5**: gateway core, provider adapters, routing and fallback
-7. **Phase 6**: rate limiting, budget enforcement and usage tracking
+5. **Phase 4**: LLM gateway core (done): [docs/api/gateway-api.md](docs/api/gateway-api.md)
+6. **Phase 5**: projects and API key management endpoints in the control plane
+7. **Phase 6**: rate limiting, budget enforcement, cost and usage tracking
 8. **Phase 7**: Kafka event pipeline and workers
-9. **Phase 8**: AI security layer (PII detection, prompt filtering)
-10. **Phase 9**: analytics dashboard
+9. **Phase 8**: AI security layer (PII detection, prompt filtering), more providers and failover
+10. **Phase 9**: analytics
 11. **Phase 10**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.

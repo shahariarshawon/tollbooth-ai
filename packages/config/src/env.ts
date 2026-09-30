@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 const DURATION = /^\d+[smhd]$/;
 
+/** `KEY=` in a .env file arrives as an empty string; treat it as unset. */
+const blankToUndefined = (value: unknown): unknown => (value === '' ? undefined : value);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535),
@@ -18,9 +21,25 @@ const envSchema = z.object({
     .regex(DURATION, 'use a number and a unit: 30s, 15m, 12h, 7d')
     .default('7d'),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
-  OPENAI_API_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  GOOGLE_AI_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+  ANTHROPIC_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+  GOOGLE_AI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+  OPENAI_BASE_URL: z.preprocess(
+    blankToUndefined,
+    z.string().url().default('https://api.openai.com/v1'),
+  ),
+  /** Port for the gateway; falls back to PORT when unset. */
+  GATEWAY_PORT: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1).max(65535).optional(),
+  ),
+  /** Upper bound a client may request in max_tokens. */
+  GATEWAY_MAX_TOKENS: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).default(4096)),
+  /** How long the gateway waits for an AI provider before giving up. */
+  GATEWAY_PROVIDER_TIMEOUT_MS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1000).default(60_000),
+  ),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

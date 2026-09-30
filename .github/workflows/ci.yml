@@ -46,6 +46,10 @@ jobs:
       - run: pnpm --filter @tollbooth/control-plane test:e2e
         env:
           JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+      # Runs the gateway against a local fake OpenAI server, so no API key or network is needed.
+      - run: pnpm --filter @tollbooth/gateway test:e2e
+        env:
+          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
 
   ai-service:
     runs-on: ubuntu-latest
