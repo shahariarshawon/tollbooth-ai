@@ -39,7 +39,7 @@ export class ApiKeyService {
         status: true,
         expiresAt: true,
         lastUsedAt: true,
-        tenant: { select: { status: true } },
+        tenant: { select: { status: true, plan: true } },
         project: { select: { status: true } },
       },
     });
@@ -65,6 +65,7 @@ export class ApiKeyService {
       apiKeyId: key.id,
       tenantId: key.tenantId,
       projectId: key.projectId,
+      plan: key.tenant.plan,
       permissions: key.permissions,
       rateLimit: key.rateLimit,
     };

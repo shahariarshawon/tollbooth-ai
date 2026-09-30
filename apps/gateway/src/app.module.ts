@@ -6,9 +6,10 @@ import { createValidationPipe } from './common/pipes/create-validation-pipe';
 import { ConfigModule } from './config/config.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { HealthController } from './health.controller';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, GatewayModule],
+  imports: [ConfigModule, DatabaseModule, RedisModule, GatewayModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_FILTER, useClass: OpenAiErrorFilter },

@@ -13,7 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379
     services:
+      # The gateway tests exercise the real rate limiter, budget counters and circuit breaker.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
       # pgvector image: the initial migration creates the vector extension.
       postgres:
         image: pgvector/pgvector:pg17

@@ -15,14 +15,28 @@ export class OpenAiErrorFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
-    const { status, payload } = this.toResponse(exception, http.getRequest<GatewayRequest>());
-    http
-      .getResponse<Response>()
-      .status(status)
-      .json({ error: { param: null, ...payload } });
+    const { status, payload, headers } = this.toResponse(
+      exception,
+      http.getRequest<GatewayRequest>(),
+    );
+    const response = http.getResponse<Response>();
+    for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
+    response.status(status).json({ error: { param: null, ...payload } });
   }
 
   private toResponse(
+    exception: unknown,
+    request: GatewayRequest,
+  ): { status: number; payload: ErrorPayload; headers: Record<string, string> } {
+    const result = this.classify(exception, request);
+    return {
+      status: result.status,
+      payload: result.payload,
+      headers: exception instanceof GatewayException ? exception.headers : {},
+    };
+  }
+
+  private classify(
     exception: unknown,
     request: GatewayRequest,
   ): { status: number; payload: ErrorPayload } {

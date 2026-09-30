@@ -1,5 +1,6 @@
 import { ArgumentsHost, Logger, NotFoundException } from '@nestjs/common';
 import { GatewayErrors } from '../errors/gateway.exception';
+import { ProviderUnavailableException } from '../errors/traffic.exceptions';
 import { OpenAiErrorFilter } from './openai-error.filter';
 
 function run(exception: unknown) {
@@ -34,7 +35,7 @@ describe('OpenAiErrorFilter', () => {
 
   it.each([
     [GatewayErrors.modelNotFound('x'), 400, 'model_not_found'],
-    [GatewayErrors.providerUnavailable(), 503, 'provider_unavailable'],
+    [new ProviderUnavailableException(), 503, 'provider_unavailable'],
     [GatewayErrors.keyPermissionDenied('chat:completions'), 403, 'insufficient_permissions'],
   ])('keeps the status and code of a GatewayException', (exception, expectedStatus, code) => {
     const { status, body } = run(exception);

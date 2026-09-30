@@ -251,6 +251,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      ioredis:
+        specifier: ^6.0.0
+        version: 6.0.0
       js-tiktoken:
         specifier: ^1.0.21
         version: 1.0.21

@@ -6,8 +6,9 @@ Tollbooth AI sits between your applications and AI providers (OpenAI, Anthropic,
 controls who can use which model, tracks tokens and cost, enforces budgets, falls back between
 providers when one fails, and screens prompts for sensitive data.
 
-> **Status: Phase 4 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
-> isolation), the dashboard and the OpenAI-compatible gateway core are in place. The dashboard shows
+> **Status: Phase 5 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
+> isolation), the dashboard the OpenAI-compatible gateway and its Redis traffic controls (rate limits, token quotas, budget
+> counters, circuit breaker) are in place. The dashboard shows
 > sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
@@ -143,11 +144,12 @@ reuse them outside local development.
 3. **Phase 2**: authentication, RBAC, tenant isolation, user and tenant management (done)
 4. **Phase 3**: dashboard frontend (done): [docs/frontend/dashboard-guide.md](docs/frontend/dashboard-guide.md)
 5. **Phase 4**: LLM gateway core (done): [docs/api/gateway-api.md](docs/api/gateway-api.md)
-6. **Phase 5**: projects and API key management endpoints in the control plane
-7. **Phase 6**: rate limiting, budget enforcement, cost and usage tracking
-8. **Phase 7**: Kafka event pipeline and workers
-9. **Phase 8**: AI security layer (PII detection, prompt filtering), more providers and failover
-10. **Phase 9**: analytics
-11. **Phase 10**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
+6. **Phase 5**: Redis layer: rate limits, token quotas, budget counters, circuit breaker (done):
+   [docs/architecture/redis-layer.md](docs/architecture/redis-layer.md)
+7. **Next**: projects and API key management endpoints in the control plane
+8. Cost, usage tracking and billing, including rebuilding budget counters from the database
+9. Kafka event pipeline and workers
+10. AI security layer (PII detection, prompt filtering), more providers and failover
+11. Analytics, then observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.

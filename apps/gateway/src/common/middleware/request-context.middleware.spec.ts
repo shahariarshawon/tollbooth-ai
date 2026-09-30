@@ -55,7 +55,14 @@ describe('requestContextMiddleware', () => {
     const { req, res } = run(
       {},
       {
-        auth: { tenantId: 't1', projectId: 'p1', apiKeyId: 'k1', permissions: [], rateLimit: null },
+        auth: {
+          tenantId: 't1',
+          projectId: 'p1',
+          apiKeyId: 'k1',
+          plan: 'FREE',
+          permissions: [],
+          rateLimit: null,
+        },
       },
     );
 

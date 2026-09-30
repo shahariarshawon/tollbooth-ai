@@ -5,11 +5,29 @@ const DURATION = /^\d+[smhd]$/;
 /** `KEY=` in a .env file arrives as an empty string; treat it as unset. */
 const blankToUndefined = (value: unknown): unknown => (value === '' ? undefined : value);
 
+/** Accepts only the strings "true" and "false", so a typo fails loudly instead of quietly meaning false. */
+const envBoolean = (fallback: boolean) =>
+  z.preprocess(
+    (value) =>
+      value === '' ? undefined : value === 'true' ? true : value === 'false' ? false : value,
+    z.boolean().default(fallback),
+  );
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
+  /** When set, Redis is configured from these discrete values and REDIS_URL is ignored by the gateway. */
+  REDIS_HOST: z.preprocess(blankToUndefined, z.string().optional()),
+  REDIS_PORT: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(65535).optional()),
+  REDIS_PASSWORD: z.preprocess(blankToUndefined, z.string().optional()),
+  REDIS_TLS: envBoolean(false),
+  /** A Redis command slower than this fails, so a struggling Redis cannot stall every request. */
+  REDIS_COMMAND_TIMEOUT_MS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(50).default(1000),
+  ),
   KAFKA_BROKER: z.string().min(1),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRE: z
@@ -36,6 +54,21 @@ const envSchema = z.object({
   /** Upper bound a client may request in max_tokens. */
   GATEWAY_MAX_TOKENS: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).default(4096)),
   /** How long the gateway waits for an AI provider before giving up. */
+  /**
+   * What the gateway does when Redis is unreachable. false (default) rejects requests, because limits
+   * and budgets cannot be enforced; true lets them through, trading protection for availability.
+   */
+  GATEWAY_FAIL_OPEN: envBoolean(false),
+  /** Consecutive provider failures that open the circuit breaker. */
+  GATEWAY_CIRCUIT_FAILURE_THRESHOLD: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(1).default(5),
+  ),
+  /** How long an open circuit rejects calls before allowing a trial request. */
+  GATEWAY_CIRCUIT_OPEN_MS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(100).default(30_000),
+  ),
   GATEWAY_PROVIDER_TIMEOUT_MS: z.preprocess(
     blankToUndefined,
     z.coerce.number().int().min(1000).default(60_000),

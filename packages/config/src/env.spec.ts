@@ -69,6 +69,72 @@ describe('gateway settings', () => {
   });
 });
 
+describe('redis and traffic settings', () => {
+  it('applies defaults', () => {
+    const config = loadConfig(validEnv);
+    expect(config.REDIS_HOST).toBeUndefined();
+    expect(config.REDIS_TLS).toBe(false);
+    expect(config.REDIS_COMMAND_TIMEOUT_MS).toBe(1000);
+    expect(config.GATEWAY_FAIL_OPEN).toBe(false);
+    expect(config.GATEWAY_CIRCUIT_FAILURE_THRESHOLD).toBe(5);
+    expect(config.GATEWAY_CIRCUIT_OPEN_MS).toBe(30000);
+  });
+
+  it('treats blank values as unset, as .env.example ships them', () => {
+    const config = loadConfig({
+      ...validEnv,
+      REDIS_HOST: '',
+      REDIS_PORT: '',
+      REDIS_PASSWORD: '',
+      REDIS_TLS: '',
+      GATEWAY_FAIL_OPEN: '',
+    });
+    expect(config.REDIS_HOST).toBeUndefined();
+    expect(config.REDIS_PORT).toBeUndefined();
+    expect(config.REDIS_TLS).toBe(false);
+    expect(config.GATEWAY_FAIL_OPEN).toBe(false);
+  });
+
+  it('reads explicit values', () => {
+    const config = loadConfig({
+      ...validEnv,
+      REDIS_HOST: 'redis.prod',
+      REDIS_PORT: '6390',
+      REDIS_PASSWORD: 'secret',
+      REDIS_TLS: 'true',
+      GATEWAY_FAIL_OPEN: 'true',
+      GATEWAY_CIRCUIT_FAILURE_THRESHOLD: '3',
+      GATEWAY_CIRCUIT_OPEN_MS: '5000',
+    });
+    expect(config).toMatchObject({
+      REDIS_HOST: 'redis.prod',
+      REDIS_PORT: 6390,
+      REDIS_PASSWORD: 'secret',
+      REDIS_TLS: true,
+      GATEWAY_FAIL_OPEN: true,
+      GATEWAY_CIRCUIT_FAILURE_THRESHOLD: 3,
+      GATEWAY_CIRCUIT_OPEN_MS: 5000,
+    });
+  });
+
+  it('rejects a boolean that is not exactly true or false, so a typo cannot silently change behaviour', () => {
+    expect(() => loadConfig({ ...validEnv, GATEWAY_FAIL_OPEN: 'yes' })).toThrow(
+      /GATEWAY_FAIL_OPEN/,
+    );
+    expect(() => loadConfig({ ...validEnv, REDIS_TLS: '1' })).toThrow(/REDIS_TLS/);
+  });
+
+  it('rejects out-of-range values', () => {
+    expect(() => loadConfig({ ...validEnv, REDIS_PORT: '70000' })).toThrow(/REDIS_PORT/);
+    expect(() => loadConfig({ ...validEnv, REDIS_COMMAND_TIMEOUT_MS: '5' })).toThrow(
+      /REDIS_COMMAND_TIMEOUT_MS/,
+    );
+    expect(() => loadConfig({ ...validEnv, GATEWAY_CIRCUIT_FAILURE_THRESHOLD: '0' })).toThrow(
+      /GATEWAY_CIRCUIT_FAILURE_THRESHOLD/,
+    );
+  });
+});
+
 describe('durationToSeconds', () => {
   it.each([
     ['30s', 30],

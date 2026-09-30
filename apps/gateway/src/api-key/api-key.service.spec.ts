@@ -22,7 +22,7 @@ const activeRow = (overrides: Record<string, unknown> = {}) => ({
   status: 'ACTIVE',
   expiresAt: null,
   lastUsedAt: new Date(),
-  tenant: { status: 'ACTIVE' },
+  tenant: { status: 'ACTIVE', plan: 'STARTUP' },
   project: { status: 'ACTIVE' },
   ...overrides,
 });
@@ -50,6 +50,7 @@ describe('ApiKeyService', () => {
       apiKeyId: 'k1',
       tenantId: 't1',
       projectId: 'p1',
+      plan: 'STARTUP',
       permissions: ['chat:completions'],
       rateLimit: 60,
     });

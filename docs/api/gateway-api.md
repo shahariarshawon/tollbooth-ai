@@ -110,6 +110,10 @@ Errors arrive as the SDK's own exceptions (`BadRequestError`, `AuthenticationErr
 
 No authentication. Returns `{ "status": "ok", "service": "gateway", "uptimeSeconds": 12 }`.
 
+### `GET /health/redis`
+
+No authentication. `200 {"status":"healthy","latency":"1ms"}`, or `503 {"status":"unhealthy","error":"Redis is not reachable"}`.
+
 ## Authentication
 
 Every `/v1` request needs `Authorization: Bearer tb_<secret>`.
@@ -129,20 +133,46 @@ whether a key ever existed. A valid key whose tenant is suspended or whose proje
 Request
   1. request id            X-Request-ID generated (or accepted if safe)
   2. API key validation    hash, look up, check status and expiry
-  3. tenant identification tenant and project read from the key
+  3. tenant identification tenant, project and plan read from the key
   4. permission check      key must hold chat:completions
-  5. request validation    DTO rules, unknown fields rejected, max_tokens ceiling, stream refused
-  6. model validation      model exists and is active in the catalogue
-  7. provider selection    provider enabled, implemented and configured
-  8. provider call         OpenAI SDK, normalised to a provider-neutral result
-  9. save request record   ai_requests row: tenant, project, key, provider, model, tokens, latency, status
- 10. respond               OpenAI-shaped JSON
+  5. rate limit            requests per minute for the tenant and for the key   -> 429   (Redis)
+  6. budget pre-check      has the tenant already used its whole month?         -> 402   (Redis)
+  7. request validation    DTO rules, unknown fields rejected, max_tokens ceiling, stream refused
+  8. model validation      model exists and is active in the catalogue
+  9. provider selection    provider enabled, implemented and configured
+ 10. token quota           reserve estimated tokens per minute                  -> 429   (Redis)
+ 11. budget reservation    hold the worst-case cost of this request             -> 402   (Redis)
+ 12. circuit breaker       is the provider healthy?                             -> 503   (Redis)
+ 13. provider call         OpenAI SDK, normalised to a provider-neutral result
+ 14. update counters       settle tokens and budget to real usage, update the circuit
+ 15. save request record   ai_requests row: tenant, project, key, provider, model, tokens, latency, status
+ 16. respond               OpenAI-shaped JSON
 ```
+
+Steps 5 to 6 and 10 to 12 are the traffic controls, described in
+[docs/architecture/redis-layer.md](../architecture/redis-layer.md). A request refused at any of them never
+reaches the provider, and whatever an earlier control took (tokens, budget) is handed back.
 
 Every call that reaches a provider is recorded in `ai_requests`, whether it succeeded (`SUCCESS`) or not
 (`FAILED`, with a short reason such as `timeout`, `auth` or `rate_limited`). Requests rejected before a
-provider is chosen (bad key, invalid body, unknown model) are not recorded. `latencyMs` covers the gateway's
-work up to the provider's answer. `estimatedCost` is left at 0 until billing exists.
+provider call (bad key, limits, invalid body, unknown model, open circuit) are not recorded. `latencyMs` covers
+the gateway's work up to the provider's answer. `estimatedCost` is left at 0 until billing exists.
+
+## Rate limits and budgets
+
+Limits depend on the tenant plan (see the table in the Redis layer document); a key's own `rateLimit` overrides
+the per-key request limit. Every response to an authenticated request carries:
+
+| Header                           | Meaning                                                      |
+| -------------------------------- | ------------------------------------------------------------ |
+| `X-RateLimit-Limit-Requests`     | the requests-per-minute limit that is closest to running out |
+| `X-RateLimit-Remaining-Requests` | requests left this minute                                    |
+| `X-RateLimit-Reset-Requests`     | time until the window resets, for example `47s`              |
+
+A `429` adds `Retry-After` (seconds), and a token-quota `429` adds `X-RateLimit-Limit-Tokens`. A circuit-open
+`503` adds `Retry-After` too. Token quotas count the prompt plus the most the request may generate
+(`max_tokens`, or 1024 when unset), so a large `max_tokens` uses up quota even if the answer is short; the
+counters are corrected to real usage once the call finishes.
 
 ## Errors
 
@@ -203,6 +233,16 @@ Each request writes one JSON line to stdout when it finishes, including rejected
 
 `latency` is milliseconds for the whole request. Prompts, completions and keys are never logged.
 
+The traffic controls also log an event when they act (`level: warn`), for example:
+
+```json
+{"timestamp":"2026-10-01T10:00:01.000Z","level":"warn","event":"rate_limit_blocked","requestId":"req_4f1c...","tenantId":"9e3c...","apiKeyId":"3eef...","scope":"key","limit":20,"window":"1m"}
+{"timestamp":"2026-10-01T10:00:02.000Z","level":"warn","event":"budget_blocked","requestId":"req_77aa...","tenantId":"9e3c...","requested":617,"remaining":1,"monthlyLimit":100000000,"unit":"micro_usd"}
+```
+
+Others: `token_quota_blocked`, `circuit_state_changed`, `circuit_open_rejected`, `circuit_trial_request`,
+`redis_ready`, `redis_error`, `traffic_control_redis_failure`.
+
 ## Configuration
 
 | Variable                      | Default                     | Notes                                                      |
@@ -237,6 +277,6 @@ OPENAI_API_KEY=any OPENAI_BASE_URL=http://127.0.0.1:4010/v1 pnpm --filter @tollb
 
 ## Not included yet
 
-Streaming responses, other endpoints (`/v1/models`, embeddings), other providers, rate limiting, budgets,
-provider failover, cost calculation, usage events and content scanning. The request and provider abstractions
+Streaming responses, other endpoints (`/v1/models`, embeddings), other providers, provider failover, cost
+calculation for billing, usage events and content scanning. The request and provider abstractions
 are shaped so each can be added without changing the endpoint.

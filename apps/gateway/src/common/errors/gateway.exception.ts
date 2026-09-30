@@ -5,6 +5,8 @@ export type ErrorType =
   | 'invalid_request_error'
   | 'authentication_error'
   | 'permission_error'
+  | 'rate_limit_error'
+  | 'budget_error'
   | 'api_error'
   | 'server_error';
 
@@ -25,6 +27,8 @@ export class GatewayException extends HttpException {
   constructor(
     status: number,
     readonly payload: ErrorPayload,
+    /** Response headers to send with the error, for example Retry-After. */
+    readonly headers: Record<string, string> = {},
   ) {
     super(payload.message, status);
   }
@@ -83,13 +87,6 @@ export const GatewayErrors = {
       type: 'invalid_request_error',
       code: 'model_unavailable',
       param: 'model',
-    }),
-
-  providerUnavailable: () =>
-    fail(HttpStatus.SERVICE_UNAVAILABLE, {
-      message: 'The AI provider is currently unavailable. Please try again later.',
-      type: 'api_error',
-      code: 'provider_unavailable',
     }),
 
   notFound: () =>

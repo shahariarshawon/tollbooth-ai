@@ -6,6 +6,7 @@ import {
   createTestContext,
   destroyTestContext,
   http,
+  resetTrafficState,
 } from './support/context';
 import type { Fixture, TestContext } from './support/context';
 
@@ -17,10 +18,13 @@ describe('Chat completions (e2e)', () => {
     ctx = await createTestContext();
     fixture = await createFixture(ctx);
   });
-  afterAll(() => destroyTestContext(ctx));
-  beforeEach(() => {
+  afterAll(async () => {
+    if (ctx) await destroyTestContext(ctx);
+  });
+  beforeEach(async () => {
     ctx.fake.behavior = 'ok';
     ctx.fake.received.length = 0;
+    await resetTrafficState(ctx);
   });
 
   const post = (

@@ -7,6 +7,7 @@ import {
   createTestContext,
   destroyTestContext,
   http,
+  resetTrafficState,
 } from './support/context';
 import type { Fixture, TestContext } from './support/context';
 
@@ -18,10 +19,13 @@ describe('API key authentication (e2e)', () => {
     ctx = await createTestContext();
     fixture = await createFixture(ctx);
   });
-  afterAll(() => destroyTestContext(ctx));
-  beforeEach(() => {
+  afterAll(async () => {
+    if (ctx) await destroyTestContext(ctx);
+  });
+  beforeEach(async () => {
     ctx.fake.behavior = 'ok';
     ctx.fake.received.length = 0;
+    await resetTrafficState(ctx);
   });
 
   const call = (headers: Record<string, string>) =>

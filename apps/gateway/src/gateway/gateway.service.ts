@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { GatewayErrors } from '../common/errors/gateway.exception';
+import { ProviderUnavailableException } from '../common/errors/traffic.exceptions';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
 import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
@@ -11,6 +12,7 @@ import { ProviderService } from '../providers/provider.service';
 import { RequestService } from '../requests/request.service';
 import type { TokenUsage } from '../requests/request.service';
 import { TokenCounter } from '../tokens/token-counter.service';
+import { TrafficControlService } from '../traffic/traffic-control.service';
 
 export interface PipelineContext {
   requestId: string;
@@ -32,6 +34,7 @@ export class GatewayService {
     private readonly providers: ProviderService,
     private readonly requests: RequestService,
     private readonly tokens: TokenCounter,
+    private readonly traffic: TrafficControlService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -61,11 +64,25 @@ export class GatewayService {
     // Kept in case the call fails: a failed request still tells us how much the caller sent.
     const estimatedInputTokens = this.tokens.countMessages(dto.model, request.messages);
 
+    // Token quota, budget and circuit breaker. Throws 429, 402 or 503 before any provider work.
+    const admission = await this.traffic.admit({
+      requestId: context.requestId,
+      auth: context.auth,
+      providerType: model.providerType,
+      prices: model.prices,
+      inputTokens: estimatedInputTokens,
+      maxTokens: dto.max_tokens,
+    });
+
     let result: ChatCompletionResult;
     try {
       result = await model.provider.chatCompletion(request);
     } catch (error) {
       const failure = this.asProviderError(error, context);
+      await this.traffic.abort(
+        admission,
+        failure.kind === 'bad_request' ? 'caller_error' : 'provider_failure',
+      );
       await this.requests.recordFailure({
         auth: context.auth,
         provider: model.providerType,
@@ -81,11 +98,15 @@ export class GatewayService {
             undefined,
             'provider_rejected_request',
           )
-        : GatewayErrors.providerUnavailable();
+        : new ProviderUnavailableException();
     }
 
     const latencyMs = performance.now() - startedAt;
     const usage = this.usageOf(result, dto.model, estimatedInputTokens);
+    await this.traffic.complete(admission, {
+      inputTokens: usage.requestTokens,
+      outputTokens: usage.responseTokens,
+    });
     await this.requests.recordSuccess({
       auth: context.auth,
       provider: model.providerType,

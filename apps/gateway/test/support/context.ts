@@ -2,12 +2,17 @@ import type { INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '@tollbooth/database';
-import type { ApiKeyStatus } from '@tollbooth/database';
+import type { ApiKeyStatus, TenantPlan } from '@tollbooth/database';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiKeyService } from '../../src/api-key/api-key.service';
 import { AppModule } from '../../src/app.module';
+import { CIRCUIT_OPTIONS } from '../../src/circuit-breaker/circuit-breaker.service';
+import type { CircuitBreakerOptions } from '../../src/circuit-breaker/circuit-breaker.service';
 import { configureApp } from '../../src/configure-app';
+import { DEFAULT_PLAN_LIMITS, PLAN_LIMITS } from '../../src/traffic/plan-limits';
+import type { PlanLimits } from '../../src/traffic/plan-limits';
+import { RedisService } from '../../src/redis/redis.service';
 import { startFakeOpenAi } from './fake-openai';
 import type { FakeOpenAi } from './fake-openai';
 
@@ -15,6 +20,7 @@ export interface TestContext {
   app: INestApplication;
   prisma: PrismaService;
   fake: FakeOpenAi;
+  redis: RedisService;
   tenantIds: string[];
   modelIds: string[];
   providerIds: string[];
@@ -27,19 +33,69 @@ export interface Fixture {
   key: { id: string; raw: string };
 }
 
-/** Boots the real gateway against the real database, with OpenAI replaced by a local fake. */
-export async function createTestContext(): Promise<TestContext> {
+export interface ContextOptions {
+  /** Environment for this app instance only, for example to point it at a dead Redis. */
+  env?: Record<string, string>;
+  /** Replaces the plan table, to make limits small enough to hit in a test. */
+  planLimits?: Partial<Record<TenantPlan, Partial<PlanLimits>>>;
+  circuit?: Partial<CircuitBreakerOptions>;
+}
+
+/** Boots the real gateway against the real database and Redis, with OpenAI replaced by a local fake. */
+export async function createTestContext(options: ContextOptions = {}): Promise<TestContext> {
   const fake = await startFakeOpenAi();
   // Read by the config module when the application is created below.
   process.env['OPENAI_BASE_URL'] = fake.url;
+  const saved = { ...process.env };
+  Object.assign(process.env, options.env ?? {});
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
-  configureApp(app);
-  await app.init();
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  if (options.planLimits) {
+    const table = Object.fromEntries(
+      (Object.keys(DEFAULT_PLAN_LIMITS) as TenantPlan[]).map((plan) => [
+        plan,
+        { ...DEFAULT_PLAN_LIMITS[plan], ...options.planLimits?.[plan] },
+      ]),
+    );
+    builder.overrideProvider(PLAN_LIMITS).useValue(table);
+  }
+  if (options.circuit) {
+    builder.overrideProvider(CIRCUIT_OPTIONS).useFactory({
+      factory: () => ({
+        failureThreshold: 5,
+        openMs: 30_000,
+        failureWindowMs: 60_000,
+        successesToClose: 2,
+        probeTimeoutMs: 10_000,
+        ...options.circuit,
+      }),
+    });
+  }
+  let app: NestExpressApplication;
+  try {
+    const moduleRef = await builder.compile();
+    app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
+    configureApp(app);
+    await app.init();
+  } catch (error) {
+    // Do not leave the fake server listening: it would keep the test process alive forever.
+    await fake.close();
+    throw error;
+  } finally {
+    // The environment only matters while the modules above are being built.
+    process.env = saved;
+  }
 
   const prisma = app.get(PrismaService);
-  const context: TestContext = { app, prisma, fake, tenantIds: [], modelIds: [], providerIds: [] };
+  const context: TestContext = {
+    app,
+    prisma,
+    fake,
+    redis: app.get(RedisService),
+    tenantIds: [],
+    modelIds: [],
+    providerIds: [],
+  };
   await ensureCatalogue(context);
   return context;
 }
@@ -102,10 +158,13 @@ async function ensureCatalogue(context: TestContext): Promise<void> {
   context.providerIds.push(disabledProvider.id);
 }
 
-export async function createFixture(context: TestContext): Promise<Fixture> {
+export async function createFixture(
+  context: TestContext,
+  plan: TenantPlan = 'FREE',
+): Promise<Fixture> {
   const slug = unique('gw');
   const tenant = await context.prisma.tenant.create({
-    data: { companyName: `Gateway Test ${slug}`, slug },
+    data: { companyName: `Gateway Test ${slug}`, slug, plan },
   });
   context.tenantIds.push(tenant.id);
   const project = await context.prisma.project.create({
@@ -119,7 +178,12 @@ export async function createKey(
   context: TestContext,
   tenantId: string,
   projectId: string,
-  overrides: { permissions?: string[]; status?: ApiKeyStatus; expiresAt?: Date | null } = {},
+  overrides: {
+    permissions?: string[];
+    status?: ApiKeyStatus;
+    expiresAt?: Date | null;
+    rateLimit?: number;
+  } = {},
 ): Promise<{ id: string; raw: string }> {
   const raw = `tb_e2e_${randomBytes(24).toString('hex')}`;
   const row = await context.prisma.apiKey.create({
@@ -132,9 +196,35 @@ export async function createKey(
       permissions: overrides.permissions ?? ['chat:completions'],
       status: overrides.status ?? 'ACTIVE',
       expiresAt: overrides.expiresAt ?? null,
+      rateLimit: overrides.rateLimit ?? null,
     },
   });
   return { id: row.id, raw };
+}
+
+/**
+ * Forgets every counter of the tenants created so far, plus the provider circuit, so a test starts from
+ * a clean slate. Other suites and other tenants are untouched.
+ */
+export async function resetTrafficState(context: TestContext): Promise<void> {
+  const { client } = context.redis;
+  // Nothing to clear (and no way to clear it) when a test has deliberately taken Redis away.
+  if (client.status !== 'ready') return;
+  const patterns = [...context.tenantIds.map((id) => `tenant:{${id}}:*`), 'provider:*:circuit'];
+  for (const pattern of patterns) {
+    const keys = await client.keys(pattern);
+    if (keys.length > 0) await client.del(...keys);
+  }
+}
+
+/** Current value of a tenant-wide per-minute counter ("requests" or "tokens"); 0 when there is none. */
+export async function tenantCounter(
+  context: TestContext,
+  tenantId: string,
+  kind: 'requests' | 'tokens',
+): Promise<number> {
+  const [key] = await context.redis.client.keys(`tenant:{${tenantId}}:${kind}:*`);
+  return key ? Number(await context.redis.client.get(key)) : 0;
 }
 
 export const chat = (content = 'Hello', extra: Record<string, unknown> = {}) => ({
@@ -148,6 +238,7 @@ export const bearer = (raw: string) => ({ Authorization: `Bearer ${raw}` });
 /** Removes everything the suite created. Request records are RESTRICTed by design, so they go first. */
 export async function destroyTestContext(context: TestContext): Promise<void> {
   const { prisma } = context;
+  await resetTrafficState(context);
   await prisma.aiRequest.deleteMany({ where: { tenantId: { in: context.tenantIds } } });
   await prisma.tenant.deleteMany({ where: { id: { in: context.tenantIds } } });
   await prisma.aiModel.deleteMany({ where: { id: { in: context.modelIds } } });

@@ -1,4 +1,5 @@
 export type LogSink = (line: string) => void;
+export type LogLevel = 'info' | 'warn' | 'error';
 
 const stdout: LogSink = (line) => {
   process.stdout.write(`${line}\n`);
@@ -15,6 +16,6 @@ export function setLogSink(next: LogSink | null): void {
  * Writes one JSON object per line, ready for any log shipper. Callers pass identifiers and timings
  * only: never prompts, completions, API keys or provider responses.
  */
-export function logEvent(event: Record<string, unknown>): void {
-  sink?.(JSON.stringify({ time: new Date().toISOString(), level: 'info', ...event }));
+export function logEvent(event: Record<string, unknown>, level: LogLevel = 'info'): void {
+  sink?.(JSON.stringify({ timestamp: new Date().toISOString(), level, ...event }));
 }

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '@tollbooth/database';
 import type { Prisma } from '@tollbooth/database';
 import { GatewayErrors } from '../common/errors/gateway.exception';
+import { ProviderUnavailableException } from '../common/errors/traffic.exceptions';
 import { AI_PROVIDERS } from './provider.interface';
 import type { AIProvider } from './provider.interface';
 
@@ -67,7 +68,7 @@ export class ProviderService {
         };
       }
     }
-    throw GatewayErrors.providerUnavailable();
+    throw new ProviderUnavailableException();
   }
 
   private servingProvider(row: ModelRow): AIProvider | undefined {
