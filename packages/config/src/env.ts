@@ -1,12 +1,23 @@
 import { z } from 'zod';
 
+const DURATION = /^\d+[smhd]$/;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
   KAFKA_BROKER: z.string().min(1),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_ACCESS_EXPIRE: z
+    .string()
+    .regex(DURATION, 'use a number and a unit: 30s, 15m, 12h, 7d')
+    .default('15m'),
+  JWT_REFRESH_EXPIRE: z
+    .string()
+    .regex(DURATION, 'use a number and a unit: 30s, 15m, 12h, 7d')
+    .default('7d'),
+  BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   GOOGLE_AI_API_KEY: z.string().optional(),
@@ -27,4 +38,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
   return result.data;
+}
+
+const UNIT_SECONDS = { s: 1, m: 60, h: 3600, d: 86400 } as const;
+
+/** Converts a duration such as `15m` or `7d` to seconds. */
+export function durationToSeconds(duration: string): number {
+  const match = /^(\d+)([smhd])$/.exec(duration);
+  if (!match) throw new Error(`Invalid duration: ${duration}`);
+  return Number(match[1]) * UNIT_SECONDS[match[2] as keyof typeof UNIT_SECONDS];
 }

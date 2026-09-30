@@ -1,4 +1,5 @@
-import { createHash, randomBytes, scryptSync } from 'node:crypto';
+import { hash } from 'bcrypt';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaClient, ProviderType } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -6,10 +7,10 @@ const prisma = new PrismaClient();
 // Development-only credential shared by the seeded users. Never use it outside local environments.
 const DEV_PASSWORD = 'ChangeMe123!';
 
-function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
-  return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`;
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
+
+function hashPassword(password: string): Promise<string> {
+  return hash(password, BCRYPT_ROUNDS);
 }
 
 function hashApiKey(rawKey: string): string {
@@ -72,16 +73,13 @@ async function seedTenant() {
     { email: 'admin@techcorp.com', firstName: 'Ada', lastName: 'Admin', role: 'TENANT_ADMIN' },
     { email: 'developer@techcorp.com', firstName: 'Dev', lastName: 'Eloper', role: 'DEVELOPER' },
   ] as const;
+  const passwordHash = await hashPassword(DEV_PASSWORD);
   for (const user of users) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {},
-      create: {
-        ...user,
-        tenantId: tenant.id,
-        status: 'ACTIVE',
-        passwordHash: hashPassword(DEV_PASSWORD),
-      },
+      // Re-seeding resets the development password, which also migrates older hash formats.
+      update: { passwordHash },
+      create: { ...user, tenantId: tenant.id, status: 'ACTIVE', passwordHash },
     });
   }
 

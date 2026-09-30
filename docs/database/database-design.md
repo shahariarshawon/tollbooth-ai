@@ -5,15 +5,16 @@ Schema: [`prisma/schema.prisma`](../../prisma/schema.prisma). Migrations: `prism
 
 ## 1. Entity overview
 
-| Group             | Tables                                          | Nature                          |
-| ----------------- | ----------------------------------------------- | ------------------------------- |
-| Tenancy/identity  | `tenants`, `users`                              | Mutable configuration           |
-| Workloads         | `projects`, `api_keys`                          | Mutable configuration           |
-| Catalogue         | `ai_providers`, `ai_models`                     | Platform-wide, not tenant-owned |
-| Traffic and money | `ai_requests`, `usage_events`, `ledger_entries` | Append-only, high volume        |
-| Security          | `audit_logs`                                    | Append-only                     |
+| Group             | Tables                                          | Nature                                       |
+| ----------------- | ----------------------------------------------- | -------------------------------------------- |
+| Tenancy/identity  | `tenants`, `users`                              | Mutable configuration                        |
+| Workloads         | `projects`, `api_keys`                          | Mutable configuration                        |
+| Catalogue         | `ai_providers`, `ai_models`                     | Platform-wide, not tenant-owned              |
+| Traffic and money | `ai_requests`, `usage_events`, `ledger_entries` | Append-only, high volume                     |
+| Security          | `audit_logs`, `refresh_tokens`                  | Audit is append-only; tokens are short-lived |
 
-Ten tables, one per entity in the brief. No join or helper tables were added.
+Eleven tables: one per entity in the brief, plus `refresh_tokens`, added in Phase 2 (migration
+`002_auth_refresh_tokens`). No join or helper tables.
 
 ## 2. ER diagram
 
@@ -91,12 +92,21 @@ erDiagram
     }
     audit_logs {
         uuid id PK
-        uuid tenantId FK
+        uuid tenantId FK "nullable"
         uuid userId FK "nullable"
         string action
         string resource
         inet ipAddress
     }
+    refresh_tokens {
+        uuid id PK
+        uuid userId FK
+        uuid familyId
+        string tokenHash UK "SHA-256"
+        timestamp expiresAt
+        timestamp revokedAt
+    }
+    users ||--o{ refresh_tokens : "holds"
     ai_providers {
         uuid id PK
         string name UK
@@ -135,7 +145,12 @@ erDiagram
   rows. **Sign convention**: negative = charge to the tenant (`AI_USAGE`), positive = funds added
   (`CREDIT`, `REFUND`). The database enforces the sign for those three types. `amount` is
   `Decimal(18,8)`, never floating point.
-- **audit_logs**: security-sensitive actions. `action` is a string constant (`API_KEY_CREATED`, ...)
+- **refresh_tokens**: opaque refresh tokens stored only as SHA-256 hashes, grouped in a `familyId` per
+  login. Rotation revokes the old token and adds a new one to the family; reusing a revoked token
+  revokes the whole family. Deleted with the user (cascade). Indexed on `tokenHash` (unique), `userId`,
+  `familyId` and `expiresAt` (for purging).
+- **audit_logs**: security-sensitive actions. `tenantId` is nullable for platform-level events such as
+  failed logins for unknown emails and super admin actions (Phase 2 change). `action` is a string constant (`API_KEY_CREATED`, ...)
   so adding an action does not need a migration. `ipAddress` uses the native `inet` type.
 - **ai_providers** and **ai_models**: the catalogue. Token prices are USD per 1,000,000 tokens.
   `configuration` holds non-secret settings only; credentials come from the environment or a

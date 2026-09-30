@@ -11,6 +11,20 @@ concurrency:
 jobs:
   node:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    services:
+      # pgvector image: the initial migration creates the vector extension.
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -23,14 +37,13 @@ jobs:
       - run: pnpm --filter "./packages/*" build
       - run: pnpm lint
       - run: pnpm format:check
-      - run: pnpm db:generate
-        env:
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm db:validate
+      - run: pnpm db:deploy
+      - run: pnpm --filter @tollbooth/control-plane test:e2e
         env:
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
 
   ai-service:
     runs-on: ubuntu-latest

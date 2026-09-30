@@ -126,11 +126,32 @@ model User {
   createdAt    DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
 
-  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  auditLogs AuditLog[]
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+// Opaque refresh tokens, stored as SHA-256 hashes. Each login starts a family; every rotation
+// revokes the presented token and issues a new one in the same family. Presenting a revoked
+// token is treated as theft and revokes the whole family.
+model RefreshToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  familyId  String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(64)
+  expiresAt DateTime  @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Project {
@@ -292,7 +313,8 @@ model LedgerEntry {
 
 model AuditLog {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId   String   @db.Uuid
+  // Null for platform-level events: unknown-email login failures and SUPER_ADMIN actions.
+  tenantId   String?  @db.Uuid
   // Null when the actor was the system, or the user has since been deleted.
   userId     String?  @db.Uuid
   // Free-form constant such as API_KEY_CREATED. A string, so new actions need no migration.
@@ -303,8 +325,8 @@ model AuditLog {
   ipAddress  String?  @db.Inet
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([userId])

@@ -9,3 +9,4 @@ onlyBuiltDependencies:
   - esbuild
   - prisma
   - sharp
+  - bcrypt

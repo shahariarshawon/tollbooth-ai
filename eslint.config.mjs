@@ -13,4 +13,10 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // NestJS injects dependencies using constructor parameter types. With emitDecoratorMetadata,
+    // those imports must stay real (value) imports, so this rule would break dependency injection.
+    files: ['apps/{gateway,control-plane,worker}/**/*.ts'],
+    rules: { '@typescript-eslint/consistent-type-imports': 'off' },
+  },
 );

@@ -6,8 +6,8 @@ Tollbooth AI sits between your applications and AI providers (OpenAI, Anthropic,
 controls who can use which model, tracks tokens and cost, enforces budgets, falls back between
 providers when one fails, and screens prompts for sensitive data.
 
-> **Status: Phase 0 (foundation).** The repo contains the monorepo, local infrastructure, CI and
-> docs. Each service only exposes a `/health` endpoint. No business features exist yet.
+> **Status: Phase 2 complete.** Foundation, database, and the control plane with authentication, RBAC
+> and tenant isolation are in place. The gateway, worker and dashboard are still skeletons.
 
 ## Architecture overview
 
@@ -84,6 +84,10 @@ pnpm --filter @tollbooth/worker dev
 pnpm --filter @tollbooth/dashboard dev        # http://localhost:3002
 ```
 
+The control plane (authentication, users, tenants) runs on the port you give it and reads `.env` in
+development. After `pnpm db:seed` you can sign in as `admin@techcorp.com` with `ChangeMe123!`; see
+[docs/api/authentication.md](docs/api/authentication.md).
+
 All Node services read the same `PORT` variable. When running several at once, override it per
 process, for example `PORT=3001 pnpm --filter @tollbooth/control-plane dev`.
 
@@ -93,6 +97,9 @@ Quality checks:
 
 ```bash
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
+
+# Integration tests: run the control plane against the real Postgres from docker compose
+pnpm --filter @tollbooth/control-plane test:e2e
 ```
 
 ## Docker setup
@@ -126,14 +133,15 @@ reuse them outside local development.
 
 ## Roadmap
 
-1. **Phase 0**: foundation, monorepo, infrastructure (this phase)
-2. **Phase 1**: multi-tenancy, database models, authentication and RBAC
-3. **Phase 2**: API key management
-4. **Phase 3**: gateway core, provider adapters, routing and fallback
-5. **Phase 4**: rate limiting, budget enforcement and usage tracking
-6. **Phase 5**: Kafka event pipeline and workers
-7. **Phase 6**: AI security layer (PII detection, prompt filtering)
-8. **Phase 7**: analytics dashboard
-9. **Phase 8**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
+1. **Phase 0**: foundation, monorepo, infrastructure (done)
+2. **Phase 1**: database schema, Prisma, migrations, seed (done)
+3. **Phase 2**: authentication, RBAC, tenant isolation, user and tenant management (done)
+4. **Phase 3**: API key management
+5. **Phase 4**: gateway core, provider adapters, routing and fallback
+6. **Phase 5**: rate limiting, budget enforcement and usage tracking
+7. **Phase 6**: Kafka event pipeline and workers
+8. **Phase 7**: AI security layer (PII detection, prompt filtering)
+9. **Phase 8**: analytics dashboard
+10. **Phase 9**: observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.
