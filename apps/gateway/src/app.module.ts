@@ -6,13 +6,14 @@ import { createValidationPipe } from './common/pipes/create-validation-pipe';
 import { ConfigModule } from './config/config.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { HealthController } from './health.controller';
+import { AppController } from './app.controller';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
 import { MetricsModule } from './metrics/metrics.module';
 import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [ConfigModule, DatabaseModule, RedisModule, GatewayModule, MetricsModule],
-  controllers: [HealthController],
+  controllers: [HealthController, AppController],
   providers: [
     { provide: APP_FILTER, useClass: OpenAiErrorFilter },
     { provide: APP_PIPE, useValue: createValidationPipe() },
