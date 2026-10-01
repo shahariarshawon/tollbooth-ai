@@ -52,6 +52,22 @@ describe('gateway settings', () => {
     expect(config.GATEWAY_MAX_TOKENS).toBe(4096);
     expect(config.GATEWAY_PROVIDER_TIMEOUT_MS).toBe(30000);
     expect(config.GATEWAY_MAX_PROVIDER_RETRIES).toBe(3);
+    expect(config.AI_SERVICE_URL).toBe('http://localhost:8000');
+    expect(config.GATEWAY_SECURITY_TIMEOUT_MS).toBe(3000);
+    expect(config.GATEWAY_SECURITY_FAIL_OPEN).toBe(false);
+  });
+
+  it('reads explicit AI Security Service settings, and rejects a malformed URL', () => {
+    const config = loadConfig({
+      ...validEnv,
+      AI_SERVICE_URL: 'http://ai-service:8000',
+      GATEWAY_SECURITY_TIMEOUT_MS: '5000',
+      GATEWAY_SECURITY_FAIL_OPEN: 'true',
+    });
+    expect(config.AI_SERVICE_URL).toBe('http://ai-service:8000');
+    expect(config.GATEWAY_SECURITY_TIMEOUT_MS).toBe(5000);
+    expect(config.GATEWAY_SECURITY_FAIL_OPEN).toBe(true);
+    expect(() => loadConfig({ ...validEnv, AI_SERVICE_URL: 'not-a-url' })).toThrow();
   });
 
   it('reads an explicit provider retry count, and rejects a negative one', () => {

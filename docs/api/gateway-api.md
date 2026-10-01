@@ -147,22 +147,24 @@ Request
   3. tenant identification tenant, project and plan read from the key
   4. permission check      key must hold chat:completions
   5. rate limit            requests per minute for the tenant and for the key   -> 429   (Redis)
-  6. budget pre-check      has the tenant already used its whole month?         -> 402   (Redis)
-  7. request validation    DTO rules, unknown fields rejected, max_tokens ceiling, stream refused
-  8. model validation      model exists and is active in the catalogue
-  9. provider routing      provider enabled in the database, implemented and configured
- 10. token quota           reserve estimated tokens per minute                  -> 429   (Redis)
- 11. budget reservation    hold the worst-case cost of this request             -> 402   (Redis)
- 12. circuit breaker       is the provider healthy?                             -> 503   (Redis)
- 13. provider call         the provider adapter (Gemini), normalised to a provider-neutral result
- 14. update counters       settle tokens and budget to real usage, update the circuit
- 15. save request record   ai_requests row: tenant, project, key, provider, model, tokens, latency, status
- 16. respond               OpenAI-shaped JSON
+  6. budget pre-check      has the tenant already used its whole month (and day, if the plan has one)? -> 402 (Redis)
+  7. AI security check     PII, prompt injection, content filter (apps/ai-service) -> 400 / 503
+  8. request validation    DTO rules, unknown fields rejected, max_tokens ceiling, stream refused
+  9. model validation      model exists and is active in the catalogue
+ 10. provider routing      provider enabled in the database, implemented and configured
+ 11. token quota           reserve estimated tokens per minute                  -> 429   (Redis)
+ 12. budget reservation    hold the worst-case cost of this request             -> 402   (Redis)
+ 13. circuit breaker       is the provider healthy?                             -> 503   (Redis)
+ 14. provider call         the provider adapter (Gemini), normalised to a provider-neutral result
+ 15. update counters       settle tokens and budget to real usage, update the circuit
+ 16. save request record   ai_requests row: tenant, project, key, provider, model, tokens, latency, status
+ 17. respond               OpenAI-shaped JSON
 ```
 
-Steps 5 to 6 and 10 to 12 are the traffic controls, described in
-[docs/architecture/redis-layer.md](../architecture/redis-layer.md). A request refused at any of them never
-reaches the provider, and whatever an earlier control took (tokens, budget) is handed back.
+Steps 5 to 6 and 11 to 13 are the traffic controls, described in
+[docs/architecture/redis-layer.md](../architecture/redis-layer.md). Step 7 is the AI Security Service,
+described in [docs/architecture/ai-security.md](../architecture/ai-security.md). A request refused at any
+of them never reaches the provider, and whatever an earlier control took (tokens, budget) is handed back.
 
 Every call that reaches a provider is recorded in `ai_requests`, whether it succeeded (`SUCCESS`) or not
 (`FAILED`, with a short reason such as `timeout`, `auth` or `rate_limited`). Requests rejected before a
@@ -207,24 +209,26 @@ Every error has the same shape, the one OpenAI clients already parse:
 }
 ```
 
-| HTTP | `code`                      | `type`                  | When                                                                 |
-| ---- | --------------------------- | ----------------------- | -------------------------------------------------------------------- |
-| 401  | `missing_api_key`           | `authentication_error`  | No `Authorization` header                                            |
-| 401  | `invalid_api_key`           | `authentication_error`  | Malformed, unknown, revoked or expired key                           |
-| 403  | `account_inactive`          | `permission_error`      | The key's tenant is not active or its project is archived            |
-| 403  | `insufficient_permissions`  | `permission_error`      | The key lacks `chat:completions`                                     |
-| 400  | `invalid_request`           | `invalid_request_error` | A field is missing or out of range (`param` names it)                |
-| 400  | `unknown_parameter`         | `invalid_request_error` | A field the gateway does not support                                 |
-| 400  | `invalid_json`              | `invalid_request_error` | The body is not valid JSON                                           |
-| 400  | `max_tokens_exceeded`       | `invalid_request_error` | `max_tokens` is above the gateway ceiling                            |
-| 400  | `streaming_not_supported`   | `invalid_request_error` | `stream: true`                                                       |
-| 400  | `model_not_found`           | `invalid_request_error` | The model is not in the catalogue                                    |
-| 400  | `model_unavailable`         | `invalid_request_error` | The model exists but is switched off                                 |
-| 400  | `provider_rejected_request` | `invalid_request_error` | The provider refused the request itself (for example a bad value)    |
-| 404  | `not_found`                 | `invalid_request_error` | Unknown route                                                        |
-| 413  | `request_too_large`         | `invalid_request_error` | Body over 1 MB                                                       |
-| 503  | `provider_unavailable`      | `api_error`             | The provider is down, rate limited, slow, disabled or not configured |
-| 500  | `internal_error`            | `server_error`          | Unexpected failure on the gateway                                    |
+| HTTP | `code`                         | `type`                  | When                                                                                     |
+| ---- | ------------------------------ | ----------------------- | ---------------------------------------------------------------------------------------- |
+| 401  | `missing_api_key`              | `authentication_error`  | No `Authorization` header                                                                |
+| 401  | `invalid_api_key`              | `authentication_error`  | Malformed, unknown, revoked or expired key                                               |
+| 403  | `account_inactive`             | `permission_error`      | The key's tenant is not active or its project is archived                                |
+| 403  | `insufficient_permissions`     | `permission_error`      | The key lacks `chat:completions`                                                         |
+| 400  | `invalid_request`              | `invalid_request_error` | A field is missing or out of range (`param` names it)                                    |
+| 400  | `unknown_parameter`            | `invalid_request_error` | A field the gateway does not support                                                     |
+| 400  | `invalid_json`                 | `invalid_request_error` | The body is not valid JSON                                                               |
+| 400  | `max_tokens_exceeded`          | `invalid_request_error` | `max_tokens` is above the gateway ceiling                                                |
+| 400  | `streaming_not_supported`      | `invalid_request_error` | `stream: true`                                                                           |
+| 400  | `model_not_found`              | `invalid_request_error` | The model is not in the catalogue                                                        |
+| 400  | `model_unavailable`            | `invalid_request_error` | The model exists but is switched off                                                     |
+| 400  | `provider_rejected_request`    | `invalid_request_error` | The provider refused the request itself (for example a bad value)                        |
+| 400  | `content_policy_violation`     | `invalid_request_error` | The AI Security Service found PII, a prompt injection attempt, or a content-filter match |
+| 404  | `not_found`                    | `invalid_request_error` | Unknown route                                                                            |
+| 413  | `request_too_large`            | `invalid_request_error` | Body over 1 MB                                                                           |
+| 503  | `provider_unavailable`         | `api_error`             | The provider is down, rate limited, slow, disabled or not configured                     |
+| 503  | `security_service_unavailable` | `api_error`             | The AI Security Service could not be reached (and `GATEWAY_SECURITY_FAIL_OPEN` is false) |
+| 500  | `internal_error`               | `server_error`          | Unexpected failure on the gateway                                                        |
 
 What errors never contain: stack traces, database errors, the gateway's provider credentials, or provider
 error text. Provider failures are reduced to `provider_unavailable`; the only provider wording passed on is
@@ -259,7 +263,7 @@ The traffic controls also log an event when they act (`level: warn`), for exampl
 ```
 
 Others: `token_quota_blocked`, `circuit_state_changed`, `circuit_open_rejected`, `circuit_trial_request`,
-`redis_ready`, `redis_error`, `traffic_control_redis_failure`.
+`redis_ready`, `redis_error`, `traffic_control_redis_failure`, `security_check_blocked`.
 
 ## Configuration
 
@@ -274,6 +278,9 @@ Others: `token_quota_blocked`, `circuit_state_changed`, `circuit_open_rejected`,
 | `GATEWAY_MAX_TOKENS`                      | `4096`                                             | Ceiling for a request's `max_tokens`                                                        |
 | `GATEWAY_PROVIDER_TIMEOUT_MS`             | `30000`                                            | One provider attempt's timeout, before a retry or `provider_unavailable`                    |
 | `GATEWAY_MAX_PROVIDER_RETRIES`            | `3`                                                | Extra attempts for a provider timeout or rate limit; 0 disables it (see provider-router.md) |
+| `AI_SERVICE_URL`                          | `http://localhost:8000`                            | The AI Security Service (see ai-security.md)                                                |
+| `GATEWAY_SECURITY_TIMEOUT_MS`             | `3000`                                             | How long the gateway waits for a security check                                             |
+| `GATEWAY_SECURITY_FAIL_OPEN`              | `false`                                            | Let a request through unchecked if the security service cannot be reached                   |
 | `DATABASE_URL`                            | none                                               | Required                                                                                    |
 
 Models come from the `ai_models` table. The seed has `gemini-2.0-flash`, `gemini-2.0-flash-lite`,
@@ -304,11 +311,13 @@ GOOGLE_AI_API_KEY=AIza-test-key-not-real GOOGLE_AI_BASE_URL=http://127.0.0.1:402
 
 ## Not included yet
 
-Streaming responses, other endpoints (`/v1/models`, embeddings), provider failover, a billing/invoicing
-system (the cost is tracked, in `estimatedCost` and the usage ledger, but there is no invoice), and content
-scanning. The request and provider abstractions are shaped so each can be added without changing the
+Streaming responses, other endpoints (`/v1/models`, embeddings), provider failover, and a
+billing/invoicing system (the cost is tracked, in `estimatedCost` and the usage ledger, but there is no
+invoice). The request and provider abstractions are shaped so each can be added without changing the
 endpoint.
 
 Usage _is_ tracked and announced: every call updates `ai_requests` and (for a success) the usage ledger
 (`docs/architecture/usage-cost-engine.md`), and a successful or failed call publishes a Kafka event
-(`docs/architecture/kafka-events.md`) that a worker consumes.
+(`docs/architecture/kafka-events.md`) that a worker consumes. Content _is_ checked, too: every request's
+text is sent to the AI Security Service before it reaches a provider
+(`docs/architecture/ai-security.md`).

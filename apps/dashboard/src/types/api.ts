@@ -111,3 +111,48 @@ export interface DashboardOverview {
   modelUsage: NamedCount[];
   providerUsage: NamedCount[];
 }
+
+// ---------------------------------------------------------------------------
+// Analytics (Phase 10). Real endpoints on the control plane (apps/control-plane/src/analytics),
+// unlike DashboardOverview above, which is still sample data.
+// ---------------------------------------------------------------------------
+
+export interface AnalyticsOverview {
+  periodDays: number;
+  totalRequests: number;
+  totalTokens: number;
+  /** null when the signed-in role lacks VIEW_BILLING (DEVELOPER). */
+  totalCost: number | null;
+  activeUsers: number;
+  activeProjects: number;
+}
+
+export interface AnalyticsUsage {
+  periodDays: number;
+  requestsOverTime: { date: string; requests: number }[];
+  tokensOverTime: { date: string; tokens: number }[];
+  providerUsage: NamedCount[];
+  topProjects: { id: string; name: string; requests: number; tokens: number }[];
+  topApiKeys: { id: string; name: string; projectName: string; requests: number; tokens: number }[];
+}
+
+export interface ModelUsageRow {
+  provider: string;
+  model: string;
+  requests: number;
+  tokens: number;
+  /** null when the signed-in role lacks VIEW_BILLING (DEVELOPER). */
+  cost: number | null;
+}
+
+export interface AnalyticsModels {
+  periodDays: number;
+  models: ModelUsageRow[];
+}
+
+export interface AnalyticsCost {
+  periodDays: number;
+  dailyCost: { date: string; cost: number }[];
+  monthlyCost: { month: string; cost: number }[];
+  providerCostBreakdown: NamedCount[];
+}

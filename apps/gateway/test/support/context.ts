@@ -18,6 +18,7 @@ import { FAKE_GEMINI_API_KEY, startFakeGemini } from './fake-gemini';
 import { startFakeOpenAi } from './fake-openai';
 import type { FakeOpenAi } from './fake-openai';
 import type { FakeProvider } from './fake-server';
+import { startFakeSecurity } from './fake-security';
 
 /** The three providers, each backed by a local fake that speaks its real wire format. */
 export interface Fakes {
@@ -32,6 +33,8 @@ export interface TestContext {
   /** The fake Gemini, the active provider. Most tests only need this one. */
   fake: FakeProvider;
   fakes: Fakes;
+  /** The fake AI Security Service. Defaults to 'ok' (nothing found); see fake-security.ts. */
+  security: FakeProvider;
   redis: RedisService;
   tenantIds: string[];
   modelIds: string[];
@@ -66,7 +69,9 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
     openai: await startFakeOpenAi(),
     anthropic: await startFakeAnthropic(),
   };
-  const closeFakes = () => Promise.all(Object.values(fakes).map((fake) => fake.close()));
+  const security = await startFakeSecurity();
+  const closeFakes = () =>
+    Promise.all([...Object.values(fakes), security].map((fake) => fake.close()));
 
   const saved = { ...process.env };
   // Read by the config module while the application is built below, then put back. Fake keys always
@@ -78,6 +83,7 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
     OPENAI_BASE_URL: fakes.openai.url,
     ANTHROPIC_API_KEY: FAKE_ANTHROPIC_API_KEY,
     ANTHROPIC_BASE_URL: fakes.anthropic.url,
+    AI_SERVICE_URL: security.url,
     ...(options.env ?? {}),
   });
 
@@ -123,6 +129,7 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
     prisma: app.get(PrismaService),
     fake: fakes.gemini,
     fakes,
+    security,
     redis: app.get(RedisService),
     tenantIds: [],
     modelIds: [],
@@ -341,5 +348,7 @@ export async function destroyTestContext(context: TestContext): Promise<void> {
     });
   }
   await context.app.close();
-  await Promise.all(Object.values(context.fakes).map((fake) => fake.close()));
+  await Promise.all(
+    [...Object.values(context.fakes), context.security].map((fake) => fake.close()),
+  );
 }

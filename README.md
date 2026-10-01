@@ -9,8 +9,9 @@ cost, enforces budgets and rate limits, and stops sending traffic to a provider 
 > **Status: the gateway is provider-agnostic, with Gemini active.** Foundation, database, the control plane
 > (authentication, RBAC, tenant isolation), the dashboard, the OpenAI-compatible gateway and its Redis traffic
 > controls (rate limits, token quotas, budget counters, circuit breaker), provider-independent cost tracking
-> and a usage ledger, and a Kafka event pipeline with a worker consuming it are all in place. The dashboard
-> shows sample data for projects, API keys and usage until their backends exist.
+> and a usage ledger, a Kafka event pipeline with a worker consuming it, and an AI Security Service checking
+> every request for PII, prompt injection and policy violations before it reaches a provider are all in
+> place. The dashboard shows sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
 
@@ -158,9 +159,12 @@ reuse them outside local development.
    ledger (done): [docs/architecture/usage-cost-engine.md](docs/architecture/usage-cost-engine.md)
 9. **Phase 8**: Kafka event pipeline and a worker consuming it (done):
    [docs/architecture/kafka-events.md](docs/architecture/kafka-events.md)
-10. **Next**: projects and API key management endpoints in the control plane
-11. AI security layer (PII detection, prompt filtering), provider failover
-12. Turning the logged Kafka events into real work: usage rollups, budget alerts, a billing export
-13. Analytics, then observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
+10. **Phase 9**: AI Security Service (PII, prompt injection and content checks before every provider
+    call) and a Redis-backed cache foundation (done): [docs/architecture/ai-security.md](docs/architecture/ai-security.md)
+11. **Next**: projects and API key management endpoints in the control plane
+12. Provider failover; turning the AI Security Service's detectors from pattern lists into something
+    smarter; wiring its cache into the gateway's hot path
+13. Turning the logged Kafka events into real work: usage rollups, budget alerts, a billing export
+14. Analytics, then observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.

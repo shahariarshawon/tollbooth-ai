@@ -73,6 +73,15 @@ export const GatewayErrors = {
       param: param ?? null,
     }),
 
+  /** 400. The AI Security Service found PII, a prompt injection attempt, or a content-filter match. */
+  contentPolicyViolation: (message: string) =>
+    fail(HttpStatus.BAD_REQUEST, {
+      message,
+      type: 'invalid_request_error',
+      code: 'content_policy_violation',
+      param: 'messages',
+    }),
+
   modelNotFound: (model: string) =>
     fail(HttpStatus.BAD_REQUEST, {
       message: `The model "${model}" does not exist.`,

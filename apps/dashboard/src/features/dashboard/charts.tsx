@@ -110,6 +110,38 @@ export function RequestVolumeChart({ data }: { data: DashboardOverview['requestV
   );
 }
 
+/** Phase 10: token usage over time. Same shape as RequestVolumeChart, one field over, for the
+ *  analytics page's own trend chart (apps/control-plane's /analytics/usage, not DashboardOverview). */
+export function TokenUsageChart({ data }: { data: { date: string; tokens: number }[] }) {
+  return (
+    <ChartCard title="Token usage" description="Tokens per day">
+      <AreaChart data={data} margin={{ left: -8, right: 8, top: 8 }}>
+        <defs>
+          <linearGradient id="tokenFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="date" tickFormatter={shortDate} minTickGap={32} {...AXIS} />
+        <YAxis tickFormatter={formatCompactNumber} width={48} {...AXIS} />
+        <Tooltip
+          {...TOOLTIP}
+          labelFormatter={(label) => shortDate(String(label))}
+          formatter={(value) => [formatCompactNumber(Number(value)), 'Tokens']}
+        />
+        <Area
+          type="monotone"
+          dataKey="tokens"
+          stroke="var(--chart-2)"
+          strokeWidth={2}
+          fill="url(#tokenFill)"
+        />
+      </AreaChart>
+    </ChartCard>
+  );
+}
+
 export function CostTrendChart({ data }: { data: DashboardOverview['costTrend'] }) {
   return (
     <ChartCard title="Cost trend" description="Estimated spend per day">

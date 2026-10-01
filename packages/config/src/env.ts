@@ -97,6 +97,19 @@ const envSchema = z.object({
     blankToUndefined,
     z.coerce.number().int().min(0).default(3),
   ),
+  /** The AI Security Service (Python/FastAPI): PII, prompt-injection and content checks. */
+  AI_SERVICE_URL: z.preprocess(blankToUndefined, z.string().url().default('http://localhost:8000')),
+  /** How long the gateway waits for a security check before treating the service as unreachable. */
+  GATEWAY_SECURITY_TIMEOUT_MS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(100).default(3_000),
+  ),
+  /**
+   * What the gateway does when the AI Security Service cannot be reached. false (default) rejects the
+   * request with 503, because its content could not be checked; true lets it through unchecked, trading
+   * that protection for availability. Mirrors GATEWAY_FAIL_OPEN's naming and default.
+   */
+  GATEWAY_SECURITY_FAIL_OPEN: envBoolean(false),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
