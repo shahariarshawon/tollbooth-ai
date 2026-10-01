@@ -9,6 +9,7 @@ import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { TenantContextGuard } from './common/guards/tenant-context.guard';
 import { ConfigModule } from './config/config.module';
 import { HealthController } from './health.controller';
+import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesGuard } from './roles/roles.guard';
 import { RolesModule } from './roles/roles.module';
@@ -27,7 +28,7 @@ import { UsersModule } from './users/users.module';
     AnalyticsModule,
     AlertModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AppController],
   providers: [
     // Global guards run in this order: authenticate, resolve tenant, check permissions.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
