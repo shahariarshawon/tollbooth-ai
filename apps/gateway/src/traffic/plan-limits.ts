@@ -11,6 +11,8 @@ export interface PlanLimits {
   keyTokensPerMinute: number;
   /** USD a tenant may spend per calendar month. */
   monthlyBudgetUsd: number;
+  /** USD a tenant may spend per calendar day, in addition to the monthly cap. Undefined: no daily cap. */
+  dailyBudgetUsd?: number;
 }
 
 /**
@@ -60,6 +62,8 @@ export interface ResolvedLimits {
   keyTokens: number;
   /** Micro-dollars (1 USD = 1,000,000), so budget arithmetic is exact integer math. */
   monthlyBudgetMicroUsd: number;
+  /** Undefined when the plan has no daily cap, the default for every plan today. */
+  dailyBudgetMicroUsd: number | undefined;
 }
 
 @Injectable()
@@ -74,6 +78,8 @@ export class TrafficLimits {
       tenantTokens: plan.tokensPerMinute,
       keyTokens: plan.keyTokensPerMinute,
       monthlyBudgetMicroUsd: Math.round(plan.monthlyBudgetUsd * 1_000_000),
+      dailyBudgetMicroUsd:
+        plan.dailyBudgetUsd === undefined ? undefined : Math.round(plan.dailyBudgetUsd * 1_000_000),
     };
   }
 }

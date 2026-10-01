@@ -76,12 +76,21 @@ curl http://localhost:3000/v1/chat/completions \
       "finish_reason": "stop"
     }
   ],
-  "usage": { "prompt_tokens": 9, "completion_tokens": 9, "total_tokens": 18 }
+  "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 9,
+    "total_tokens": 18,
+    "estimated_cost": "0.00000500"
+  }
 }
 ```
 
-`usage` is what the provider reported. If a provider reports none, the gateway counts tokens itself with the
-OpenAI tokenizer.
+`prompt_tokens`, `completion_tokens` and `total_tokens` are what the provider reported. If a provider reports
+none, the gateway counts tokens itself with the OpenAI tokenizer. `estimated_cost` is Tollbooth-specific and
+additive to the OpenAI shape (an OpenAI SDK or client that only reads the three token fields is unaffected):
+USD, as a decimal string so no precision is lost, computed from the model's prices in `ai_models` and `"0"` on
+a free-tier provider account. It is the same figure saved as `ai_requests.estimatedCost` and charged to the
+tenant's budget; see [usage-cost-engine.md](../architecture/usage-cost-engine.md).
 
 ### Using an OpenAI SDK
 
@@ -158,7 +167,9 @@ reaches the provider, and whatever an earlier control took (tokens, budget) is h
 Every call that reaches a provider is recorded in `ai_requests`, whether it succeeded (`SUCCESS`) or not
 (`FAILED`, with a short reason such as `timeout`, `auth` or `rate_limited`). Requests rejected before a
 provider call (bad key, limits, invalid body, unknown model, open circuit) are not recorded. `latencyMs` covers
-the gateway's work up to the provider's answer. `estimatedCost` is left at 0 until billing exists.
+the gateway's work up to the provider's answer. `estimatedCost` is the real cost, computed from the model's
+prices (`0` on a free tier); a successful call also gets an `AI_USAGE` row in `ledger_entries`. See
+[usage-cost-engine.md](../architecture/usage-cost-engine.md).
 
 ## Rate limits and budgets
 
@@ -175,6 +186,11 @@ A `429` adds `Retry-After` (seconds), and a token-quota `429` adds `X-RateLimit-
 `503` adds `Retry-After` too. Token quotas count the prompt plus the most the request may generate
 (`max_tokens`, or 1024 when unset), so a large `max_tokens` uses up quota even if the answer is short; the
 counters are corrected to real usage once the call finishes.
+
+A plan has a monthly budget, and may optionally have a daily one on top of it (`dailyBudgetUsd`, undefined —
+no cap — for every plan today). Both are checked and reserved the same way; either one being exhausted answers
+`402 budget_exceeded`. See [usage-cost-engine.md](../architecture/usage-cost-engine.md) for the full budget
+and ledger design.
 
 ## Errors
 
@@ -247,17 +263,18 @@ Others: `token_quota_blocked`, `circuit_state_changed`, `circuit_open_rejected`,
 
 ## Configuration
 
-| Variable                                  | Default                                            | Notes                                                                                   |
-| ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `GOOGLE_AI_API_KEY`                       | none                                               | Gemini, the active provider. Without it Gemini models answer `503 provider_unavailable` |
-| `GOOGLE_AI_BASE_URL`                      | `https://generativelanguage.googleapis.com/v1beta` | Gemini endpoint                                                                         |
-| `GATEWAY_DEFAULT_PROVIDER`                | `gemini`                                           | Which provider serves a model offered by several active ones                            |
-| `OPENAI_API_KEY`, `OPENAI_BASE_URL`       | none, `https://api.openai.com/v1`                  | Optional. OpenAI is ready but switched off by default                                   |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` | none, `https://api.anthropic.com`                  | Optional. Anthropic is ready but switched off by default                                |
-| `GATEWAY_PORT`                            | falls back to `PORT`                               |                                                                                         |
-| `GATEWAY_MAX_TOKENS`                      | `4096`                                             | Ceiling for a request's `max_tokens`                                                    |
-| `GATEWAY_PROVIDER_TIMEOUT_MS`             | `60000`                                            | After this the call fails as `provider_unavailable`                                     |
-| `DATABASE_URL`                            | none                                               | Required                                                                                |
+| Variable                                  | Default                                            | Notes                                                                                       |
+| ----------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GOOGLE_AI_API_KEY`                       | none                                               | Gemini, the active provider. Without it Gemini models answer `503 provider_unavailable`     |
+| `GOOGLE_AI_BASE_URL`                      | `https://generativelanguage.googleapis.com/v1beta` | Gemini endpoint                                                                             |
+| `GATEWAY_DEFAULT_PROVIDER`                | `gemini`                                           | Which provider serves a model offered by several active ones                                |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`       | none, `https://api.openai.com/v1`                  | Optional. OpenAI is ready but switched off by default                                       |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` | none, `https://api.anthropic.com`                  | Optional. Anthropic is ready but switched off by default                                    |
+| `GATEWAY_PORT`                            | falls back to `PORT`                               |                                                                                             |
+| `GATEWAY_MAX_TOKENS`                      | `4096`                                             | Ceiling for a request's `max_tokens`                                                        |
+| `GATEWAY_PROVIDER_TIMEOUT_MS`             | `30000`                                            | One provider attempt's timeout, before a retry or `provider_unavailable`                    |
+| `GATEWAY_MAX_PROVIDER_RETRIES`            | `3`                                                | Extra attempts for a provider timeout or rate limit; 0 disables it (see provider-router.md) |
+| `DATABASE_URL`                            | none                                               | Required                                                                                    |
 
 Models come from the `ai_models` table. The seed has `gemini-2.0-flash`, `gemini-2.0-flash-lite`,
 `gemini-2.5-flash` and `gemini-2.5-pro` (Gemini, active), plus `gpt-4`, `gpt-4o`, `gpt-4o-mini` (OpenAI) and

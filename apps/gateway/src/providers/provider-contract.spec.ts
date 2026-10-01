@@ -62,6 +62,23 @@ describe.each<[string, AIProvider, string, string]>([
     expect(typeof provider.isConfigured).toBe('function');
   });
 
+  it('names itself for logs and the dashboard', () => {
+    expect(typeof provider.getProviderName()).toBe('string');
+    expect(provider.getProviderName().length).toBeGreaterThan(0);
+  });
+
+  it('validates a model it knows and rejects one it does not', () => {
+    expect(provider.validateModel('gemini-2.0-flash')).toBe(id === 'gemini');
+    expect(provider.validateModel('not-a-real-model')).toBe(false);
+  });
+
+  it('rejects streamCompletion with a classified, not-yet-supported error', async () => {
+    await expect(provider.streamCompletion(request)).rejects.toMatchObject({
+      name: 'ProviderError',
+      kind: 'bad_request',
+    });
+  });
+
   it('is configured when it has a key', () => {
     expect(provider.isConfigured()).toBe(true);
   });

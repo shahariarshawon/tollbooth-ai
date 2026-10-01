@@ -4,8 +4,9 @@ import OpenAI from 'openai';
 import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
 import { TokenCounter } from '../tokens/token-counter.service';
-import { lookupModelInfo } from './model-info';
-import { usageFromResult } from './provider-support';
+import { lookupModelInfo, modelIsKnown, PROVIDER_DISPLAY_NAMES } from './model-info';
+import { rejectStreaming, usageFromResult } from './provider-support';
+import { withProviderRetry } from './provider-retry';
 import { ProviderError } from './provider.interface';
 import type {
   AIProvider,
@@ -21,6 +22,7 @@ export class OpenAIProvider implements AIProvider {
   readonly id: ProviderId = 'openai';
   readonly type: ProviderType = 'OPENAI';
   private readonly client: OpenAI | null;
+  private readonly maxRetries: number;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
@@ -31,29 +33,49 @@ export class OpenAIProvider implements AIProvider {
           apiKey: config.OPENAI_API_KEY,
           baseURL: config.OPENAI_BASE_URL,
           timeout: config.GATEWAY_PROVIDER_TIMEOUT_MS,
-          // Retrying and failing over belong to a later phase; one attempt keeps latency honest.
+          // The SDK's own retries are off: GATEWAY_MAX_PROVIDER_RETRIES below retries the same classified
+          // failures (timeout, rate limit) the same way as every other provider, instead of the OpenAI
+          // SDK's own, differently-tuned policy.
           maxRetries: 0,
         })
       : null;
+    this.maxRetries = config.GATEWAY_MAX_PROVIDER_RETRIES;
   }
 
   isConfigured(): boolean {
     return this.client !== null;
   }
 
+  getProviderName(): string {
+    return PROVIDER_DISPLAY_NAMES[this.id];
+  }
+
   getModelInfo(model: string): ModelInfo | undefined {
     return lookupModelInfo(this.id, model);
+  }
+
+  validateModel(model: string): boolean {
+    return modelIsKnown(this.id, model);
   }
 
   calculateUsage(request: ChatCompletionRequest, result: ChatCompletionResult): TokenUsage {
     return usageFromResult(this.tokens, request, result);
   }
 
+  streamCompletion(): Promise<never> {
+    return rejectStreaming();
+  }
+
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
     if (!this.client) throw new ProviderError('unavailable', 'OpenAI is not configured');
 
+    return withProviderRetry(() => this.attempt(request), { maxRetries: this.maxRetries });
+  }
+
+  private async attempt(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
+    const client = this.client!;
     try {
-      const response = await this.client.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: request.model,
         messages: request.messages,
         stream: false,

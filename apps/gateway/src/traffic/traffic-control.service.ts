@@ -34,6 +34,8 @@ export interface Admission {
   prices: ModelPrices;
   tokens: TokenReservation | null;
   budget: BudgetReservation | null;
+  /** Null when the tenant's plan has no daily cap (today, every plan), not just when Redis is down. */
+  dailyBudget: BudgetReservation | null;
 }
 
 export interface Usage {
@@ -64,17 +66,31 @@ export class TrafficControlService {
     const { auth, requestId } = input;
     const limits = this.limits.forAuth(auth);
     const estimatedTokens = input.inputTokens + (input.maxTokens ?? DEFAULT_OUTPUT_TOKEN_ESTIMATE);
+    const worstCase = worstCaseMicroUsd(input.prices, input.inputTokens, input.maxTokens);
 
     const tokens = await this.tokenQuota.reserve(auth, limits, estimatedTokens, { requestId });
 
     let budget: BudgetReservation | null = null;
+    let dailyBudget: BudgetReservation | null = null;
     try {
       budget = await this.budget.reserveBudget(
         auth.tenantId,
         limits.monthlyBudgetMicroUsd,
-        worstCaseMicroUsd(input.prices, input.inputTokens, input.maxTokens),
+        worstCase,
         { requestId },
       );
+
+      // A daily cap is optional (undefined for every plan today); only reserve one when the plan has it.
+      if (limits.dailyBudgetMicroUsd !== undefined) {
+        dailyBudget = await this.budget.reserveBudget(
+          auth.tenantId,
+          limits.dailyBudgetMicroUsd,
+          worstCase,
+          { requestId },
+          new Date(),
+          'day',
+        );
+      }
 
       const decision = await this.breaker.canRequest(input.providerId);
       if (!decision.allowed) {
@@ -92,11 +108,15 @@ export class TrafficControlService {
         throw new ProviderUnavailableException(decision.retryAfterSeconds);
       }
     } catch (error) {
-      await Promise.all([this.tokenQuota.release(tokens), this.budget.releaseBudget(budget)]);
+      await Promise.all([
+        this.tokenQuota.release(tokens),
+        this.budget.releaseBudget(budget),
+        this.budget.releaseBudget(dailyBudget),
+      ]);
       throw error;
     }
 
-    return { providerId: input.providerId, prices: input.prices, tokens, budget };
+    return { providerId: input.providerId, prices: input.prices, tokens, budget, dailyBudget };
   }
 
   /**
@@ -108,6 +128,7 @@ export class TrafficControlService {
     await Promise.all([
       this.tokenQuota.commit(admission.tokens, usage.inputTokens + usage.outputTokens),
       this.budget.updateUsage(admission.budget, cost),
+      this.budget.updateUsage(admission.dailyBudget, cost),
       this.breaker.recordSuccess(admission.providerId),
     ]);
     return cost;
@@ -124,6 +145,7 @@ export class TrafficControlService {
     await Promise.all([
       this.tokenQuota.release(admission.tokens),
       this.budget.releaseBudget(admission.budget),
+      this.budget.releaseBudget(admission.dailyBudget),
       reason === 'provider_failure'
         ? this.breaker.recordFailure(admission.providerId)
         : this.breaker.recordSuccess(admission.providerId),

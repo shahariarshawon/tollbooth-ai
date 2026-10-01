@@ -50,7 +50,18 @@ describe('gateway settings', () => {
     expect(config.OPENAI_BASE_URL).toBe('https://api.openai.com/v1');
     expect(config.GATEWAY_PORT).toBeUndefined();
     expect(config.GATEWAY_MAX_TOKENS).toBe(4096);
-    expect(config.GATEWAY_PROVIDER_TIMEOUT_MS).toBe(60000);
+    expect(config.GATEWAY_PROVIDER_TIMEOUT_MS).toBe(30000);
+    expect(config.GATEWAY_MAX_PROVIDER_RETRIES).toBe(3);
+  });
+
+  it('reads an explicit provider retry count, and rejects a negative one', () => {
+    expect(
+      loadConfig({ ...validEnv, GATEWAY_MAX_PROVIDER_RETRIES: '0' }).GATEWAY_MAX_PROVIDER_RETRIES,
+    ).toBe(0);
+    expect(
+      loadConfig({ ...validEnv, GATEWAY_MAX_PROVIDER_RETRIES: '5' }).GATEWAY_MAX_PROVIDER_RETRIES,
+    ).toBe(5);
+    expect(() => loadConfig({ ...validEnv, GATEWAY_MAX_PROVIDER_RETRIES: '-1' })).toThrow();
   });
 
   it('reads explicit values and rejects a malformed base URL', () => {

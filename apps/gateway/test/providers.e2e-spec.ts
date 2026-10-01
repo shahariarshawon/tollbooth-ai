@@ -85,11 +85,12 @@ describe('AI provider abstraction (e2e)', () => {
       ctx.fakes.gemini.behavior = 'thinking';
       const res = await post().expect(200);
 
-      expect(res.body.usage).toEqual({
+      expect(res.body.usage).toMatchObject({
         prompt_tokens: 11,
         completion_tokens: 37,
         total_tokens: 48,
       });
+      expect(typeof res.body.usage.estimated_cost).toBe('string');
       expect(await lastRecord()).toMatchObject({
         provider: 'GOOGLE',
         requestTokens: 11,
@@ -150,8 +151,56 @@ describe('AI provider abstraction (e2e)', () => {
       ctx.fakes.gemini.behavior = 'hang';
       const started = Date.now();
       await post().expect(503);
-      expect(Date.now() - started).toBeLessThan(5000);
+      // A timeout is retried (GATEWAY_MAX_PROVIDER_RETRIES), so this is a few timeouts, not one.
+      expect(Date.now() - started).toBeLessThan(8000);
       expect((await lastRecord()).errorMessage).toBe('timeout');
+    });
+  });
+
+  describe('retry (GATEWAY_MAX_PROVIDER_RETRIES, 2 in tests: 3 attempts total)', () => {
+    it('recovers transparently when a transient rate limit clears before retries run out', async () => {
+      ctx.fakes.gemini.behavior = 'rate-limited';
+      setTimeout(() => {
+        ctx.fakes.gemini.behavior = 'ok';
+      }, 50);
+
+      await post().expect(200);
+
+      expect(ctx.fakes.gemini.received).toHaveLength(2);
+    });
+
+    it('answers 503 once retries are exhausted against a provider still rate limiting', async () => {
+      ctx.fakes.gemini.behavior = 'rate-limited';
+
+      const res = await post().expect(503);
+
+      expect(res.body.error.code).toBe('provider_unavailable');
+      expect((await lastRecord()).errorMessage).toBe('rate_limited');
+      expect(ctx.fakes.gemini.received).toHaveLength(3);
+    });
+
+    it('does not retry bad credentials: one call, straight to 503', async () => {
+      ctx.fakes.gemini.behavior = 'unauthorized';
+
+      await post().expect(503);
+
+      expect(ctx.fakes.gemini.received).toHaveLength(1);
+    });
+
+    it('does not retry a request the provider itself rejected: one call, straight to 400', async () => {
+      ctx.fakes.gemini.behavior = 'blocked';
+
+      await post().expect(400);
+
+      expect(ctx.fakes.gemini.received).toHaveLength(1);
+    });
+
+    it('does not retry an outage: the circuit breaker, not the retry loop, handles that', async () => {
+      ctx.fakes.gemini.behavior = 'server-error';
+
+      await post().expect(503);
+
+      expect(ctx.fakes.gemini.received).toHaveLength(1);
     });
   });
 
@@ -169,7 +218,7 @@ describe('AI provider abstraction (e2e)', () => {
       );
 
     it('records a cost computed from the model prices in the database when the account is paid', async () => {
-      await post().expect(200);
+      const res = await post().expect(200);
 
       const record = await lastRecord();
       const prices = await ctx.prisma.aiModel.findFirstOrThrow({
@@ -180,6 +229,8 @@ describe('AI provider abstraction (e2e)', () => {
         Math.ceil(7 * Number(prices.outputTokenPrice));
       expect(Number(record.estimatedCost)).toBeCloseTo(micro / 1_000_000, 8);
       expect((await budget())['currentUsage']).toBe(micro);
+      // The same figure comes back to the caller, on the response (Phase 7, Task 10).
+      expect(Number(res.body.usage.estimated_cost)).toBeCloseTo(micro / 1_000_000, 8);
     });
 
     it('records zero cost and spends no budget on a free tier, while still counting tokens', async () => {
@@ -213,6 +264,49 @@ describe('AI provider abstraction (e2e)', () => {
     });
   });
 
+  describe('usage ledger (Phase 7, Task 7)', () => {
+    const lastLedgerEntry = () =>
+      ctx.prisma.ledgerEntry.findFirstOrThrow({
+        where: { tenantId: fixture.tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+    it('writes an AI_USAGE entry linked to the request, charging the negative of its cost', async () => {
+      await setProvider(ctx, 'Google Gemini', { tier: 'paid' });
+      await post().expect(200);
+
+      const record = await lastRecord();
+      const entry = await lastLedgerEntry();
+      expect(entry).toMatchObject({
+        tenantId: fixture.tenantId,
+        requestId: record.id,
+        transactionType: 'AI_USAGE',
+        currency: 'USD',
+      });
+      expect(Number(entry.amount)).toBeCloseTo(-Number(record.estimatedCost), 8);
+      expect(Number(entry.amount)).toBeLessThan(0);
+    });
+
+    it('still writes a 0 entry on a free tier, so free usage has the same audit trail as paid usage', async () => {
+      await setProvider(ctx, 'Google Gemini', { tier: 'free' });
+      await post().expect(200);
+
+      const entry = await lastLedgerEntry();
+      expect(entry).toMatchObject({ transactionType: 'AI_USAGE' });
+      expect(Number(entry.amount)).toBe(0);
+    });
+
+    it('writes no ledger entry for a failed call: nothing was spent', async () => {
+      const before = await ctx.prisma.ledgerEntry.count({ where: { tenantId: fixture.tenantId } });
+      ctx.fakes.gemini.behavior = 'server-error';
+      await post().expect(503);
+
+      expect(await ctx.prisma.ledgerEntry.count({ where: { tenantId: fixture.tenantId } })).toBe(
+        before,
+      );
+    });
+  });
+
   describe('OpenAI adapter (ready, switched off)', () => {
     it('is not used while its provider is disabled', async () => {
       const res = await post(chat('Hi', { model: 'gpt-4o-mini' })).expect(503);
@@ -227,7 +321,12 @@ describe('AI provider abstraction (e2e)', () => {
       const res = await post(chat('Hello', { model: 'gpt-4o-mini' })).expect(200);
 
       expect(res.body.choices[0].message.content).toBe('Echo: Hello');
-      expect(res.body.usage).toEqual({ prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 });
+      expect(res.body.usage).toMatchObject({
+        prompt_tokens: 11,
+        completion_tokens: 7,
+        total_tokens: 18,
+      });
+      expect(typeof res.body.usage.estimated_cost).toBe('string');
       expect(ctx.fakes.openai.received).toHaveLength(1);
       expect(ctx.fakes.openai.received[0]?.headers.authorization).toBe(
         'Bearer sk-test-e2e-not-a-real-key',
@@ -273,7 +372,12 @@ describe('AI provider abstraction (e2e)', () => {
         finish_reason: 'stop',
       });
       // The system message travels in its own field, so the provider sees one message.
-      expect(res.body.usage).toEqual({ prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 });
+      expect(res.body.usage).toMatchObject({
+        prompt_tokens: 11,
+        completion_tokens: 7,
+        total_tokens: 18,
+      });
+      expect(typeof res.body.usage.estimated_cost).toBe('string');
 
       const received = ctx.fakes.anthropic.received[0];
       expect(received?.headers['x-api-key']).toBe(FAKE_ANTHROPIC_API_KEY);

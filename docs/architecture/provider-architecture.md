@@ -26,14 +26,17 @@ circuit breaker) work on provider ids and prices, never on a provider's name.
 
 Every provider implements this (`apps/gateway/src/providers/provider.interface.ts`):
 
-| Member                            | Purpose                                                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `id`                              | `gemini`, `openai` or `anthropic`. Used in logs and in the circuit breaker key.                            |
-| `type`                            | The matching value of the database `ProviderType` enum (`GOOGLE`, `OPENAI`, `ANTHROPIC`).                  |
-| `isConfigured()`                  | True when the provider has an API key.                                                                     |
-| `chatCompletion(request)`         | Sends the conversation and returns a neutral result. Throws a classified `ProviderError`.                  |
-| `getModelInfo(model)`             | Context window and maximum output of a model it knows, or `undefined`.                                     |
-| `calculateUsage(request, result)` | Final token counts: what the provider reported (Gemini counts reasoning tokens as output), or an estimate. |
+| Member                            | Purpose                                                                                                                                                                                                      |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                              | `gemini`, `openai` or `anthropic`. Used in logs and in the circuit breaker key.                                                                                                                              |
+| `type`                            | The matching value of the database `ProviderType` enum (`GOOGLE`, `OPENAI`, `ANTHROPIC`).                                                                                                                    |
+| `isConfigured()`                  | True when the provider has an API key.                                                                                                                                                                       |
+| `getProviderName()`               | Human-readable name (`Google Gemini`, `OpenAI`, `Anthropic`), for logs and the dashboard. `id` is the stable key used in code; this is its display name.                                                     |
+| `chatCompletion(request)`         | Sends the conversation and returns a neutral result. Throws a classified `ProviderError`. Retries a timeout or a provider rate limit itself (see [provider-router.md](provider-router.md)) before giving up. |
+| `streamCompletion(request)`       | Not implemented: every provider rejects it with the same classified error, since streaming does not exist yet.                                                                                               |
+| `getModelInfo(model)`             | Context window and maximum output of a model it knows, or `undefined`.                                                                                                                                       |
+| `validateModel(model)`            | True when the provider recognises the model by itself (backed by the same table as `getModelInfo`), independent of the database catalogue the router actually checks.                                        |
+| `calculateUsage(request, result)` | Final token counts: what the provider reported (Gemini counts reasoning tokens as output), or an estimate.                                                                                                   |
 
 `ProviderError` has a `kind`, so no code outside a provider ever parses a provider error:
 
@@ -159,6 +162,13 @@ quotas and budgets are per tenant and API key and do not depend on the provider.
 5. Insert an `ai_providers` row and `ai_models` rows (prices) with `prisma/seed.ts`.
 6. Add a fake of its API under `test/support/` and a block in `test/providers.e2e-spec.ts`. The shared
    `provider-contract.spec.ts` checks the interface for you once the provider is added to its list.
+
+## Retries and timeouts
+
+See [provider-router.md](provider-router.md) for the full retry and timeout design (Phase 6). In short:
+every provider call has a timeout (`GATEWAY_PROVIDER_TIMEOUT_MS`), and a timeout or a provider rate limit is
+retried up to `GATEWAY_MAX_PROVIDER_RETRIES` times with a short backoff; a bad request, bad credentials, or
+an outage (`unavailable`, the circuit breaker's job) are never retried.
 
 ## What is not done
 

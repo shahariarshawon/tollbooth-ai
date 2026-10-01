@@ -23,15 +23,29 @@ export class BudgetGuard implements CanActivate {
     if (!request.auth) throw GatewayErrors.missingApiKey();
 
     const { tenantId } = request.auth;
-    const limit = this.limits.forAuth(request.auth).monthlyBudgetMicroUsd;
-    const status = await this.budget.checkBudget(tenantId, limit);
+    const limits = this.limits.forAuth(request.auth);
 
+    await this.rejectIfExhausted(request.id, tenantId, limits.monthlyBudgetMicroUsd, 'month');
+    if (limits.dailyBudgetMicroUsd !== undefined) {
+      await this.rejectIfExhausted(request.id, tenantId, limits.dailyBudgetMicroUsd, 'day');
+    }
+    return true;
+  }
+
+  private async rejectIfExhausted(
+    requestId: string,
+    tenantId: string,
+    limitMicroUsd: number,
+    period: 'month' | 'day',
+  ): Promise<void> {
+    const status = await this.budget.checkBudget(tenantId, limitMicroUsd, 0, new Date(), period);
     if (status.remaining <= 0) {
       logEvent(
         {
           event: 'budget_blocked',
-          requestId: request.id,
+          requestId,
           tenantId,
+          period,
           requested: 0,
           remaining: status.remaining,
           monthlyLimit: status.monthlyLimit,
@@ -41,6 +55,5 @@ export class BudgetGuard implements CanActivate {
       );
       throw new BudgetExceededException();
     }
-    return true;
   }
 }

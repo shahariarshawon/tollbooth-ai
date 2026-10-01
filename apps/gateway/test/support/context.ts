@@ -322,10 +322,14 @@ export const chat = (content = 'Hello', extra: Record<string, unknown> = {}) => 
 
 export const bearer = (raw: string) => ({ Authorization: `Bearer ${raw}` });
 
-/** Removes everything the suite created. Request records are RESTRICTed by design, so they go first. */
+/**
+ * Removes everything the suite created. Both `ledger_entries` and `ai_requests` RESTRICT their foreign
+ * key, so the ledger (which can point at a request) goes first, then requests, then what they point to.
+ */
 export async function destroyTestContext(context: TestContext): Promise<void> {
   const { prisma } = context;
   await resetTrafficState(context);
+  await prisma.ledgerEntry.deleteMany({ where: { tenantId: { in: context.tenantIds } } });
   await prisma.aiRequest.deleteMany({ where: { tenantId: { in: context.tenantIds } } });
   await prisma.tenant.deleteMany({ where: { id: { in: context.tenantIds } } });
   await prisma.aiModel.deleteMany({ where: { id: { in: context.modelIds } } });

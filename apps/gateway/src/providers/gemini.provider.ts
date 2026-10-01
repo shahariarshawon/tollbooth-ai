@@ -4,9 +4,10 @@ import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
 import { TokenCounter } from '../tokens/token-counter.service';
 import { fromGeminiResponse, readGeminiError, toGeminiRequest } from './gemini.mapper';
-import { lookupModelInfo } from './model-info';
+import { lookupModelInfo, modelIsKnown, PROVIDER_DISPLAY_NAMES } from './model-info';
 import { errorForStatus, postJson } from './provider-http';
-import { usageFromResult } from './provider-support';
+import { rejectStreaming, usageFromResult } from './provider-support';
+import { withProviderRetry } from './provider-retry';
 import { ProviderError } from './provider.interface';
 import type {
   AIProvider,
@@ -31,6 +32,7 @@ export class GeminiProvider implements AIProvider {
   private readonly apiKey: string | undefined;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
@@ -39,19 +41,32 @@ export class GeminiProvider implements AIProvider {
     this.apiKey = config.GOOGLE_AI_API_KEY;
     this.baseUrl = config.GOOGLE_AI_BASE_URL.replace(/\/+$/, '');
     this.timeoutMs = config.GATEWAY_PROVIDER_TIMEOUT_MS;
+    this.maxRetries = config.GATEWAY_MAX_PROVIDER_RETRIES;
   }
 
   isConfigured(): boolean {
     return this.apiKey !== undefined;
   }
 
+  getProviderName(): string {
+    return PROVIDER_DISPLAY_NAMES[this.id];
+  }
+
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
     if (!this.apiKey) throw new ProviderError('unavailable', 'Gemini is not configured');
 
+    return withProviderRetry(() => this.attempt(request), { maxRetries: this.maxRetries });
+  }
+
+  streamCompletion(): Promise<never> {
+    return rejectStreaming();
+  }
+
+  private async attempt(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
     const { status, data } = await postJson(
       `${this.baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`,
       {
-        headers: { 'x-goog-api-key': this.apiKey },
+        headers: { 'x-goog-api-key': this.apiKey! },
         body: toGeminiRequest(request),
         timeoutMs: this.timeoutMs,
       },
@@ -63,6 +78,10 @@ export class GeminiProvider implements AIProvider {
 
   getModelInfo(model: string): ModelInfo | undefined {
     return lookupModelInfo(this.id, model);
+  }
+
+  validateModel(model: string): boolean {
+    return modelIsKnown(this.id, model);
   }
 
   calculateUsage(request: ChatCompletionRequest, result: ChatCompletionResult): TokenUsage {

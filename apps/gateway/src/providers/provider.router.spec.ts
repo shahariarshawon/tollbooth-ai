@@ -43,8 +43,11 @@ const fakeProvider = (id: ProviderId, type: AIProvider['type'], configured = tru
   id,
   type,
   isConfigured: () => configured,
+  getProviderName: () => id,
   chatCompletion: jest.fn(),
+  streamCompletion: jest.fn(),
   getModelInfo: (model) => ({ name: model, contextWindow: 1000, maxOutputTokens: 100 }),
+  validateModel: () => true,
   calculateUsage: jest.fn(),
 });
 

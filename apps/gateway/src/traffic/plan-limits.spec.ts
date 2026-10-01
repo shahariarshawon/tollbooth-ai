@@ -26,6 +26,23 @@ describe('TrafficLimits', () => {
     expect(Number.isInteger(resolved.monthlyBudgetMicroUsd)).toBe(true);
   });
 
+  it('has no daily cap for any plan today', () => {
+    for (const plan of Object.values(DEFAULT_PLAN_LIMITS)) {
+      expect(plan.dailyBudgetUsd).toBeUndefined();
+    }
+    expect(limits.forAuth({ plan: 'FREE', rateLimit: null }).dailyBudgetMicroUsd).toBeUndefined();
+  });
+
+  it('converts a plan with a daily cap to micro-dollars, when one is configured', () => {
+    const withDailyCap = new TrafficLimits({
+      ...DEFAULT_PLAN_LIMITS,
+      FREE: { ...DEFAULT_PLAN_LIMITS.FREE, dailyBudgetUsd: 2 },
+    });
+    expect(withDailyCap.forAuth({ plan: 'FREE', rateLimit: null }).dailyBudgetMicroUsd).toBe(
+      2_000_000,
+    );
+  });
+
   it('gives bigger plans bigger limits at every level', () => {
     const order = ['FREE', 'STARTUP', 'BUSINESS', 'ENTERPRISE'] as const;
     for (let i = 1; i < order.length; i++) {

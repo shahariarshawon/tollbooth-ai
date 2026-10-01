@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { BudgetExceededException } from '../common/errors/traffic.exceptions';
 import { logEvent } from '../common/logging/structured-logger';
 import { RedisFailurePolicy } from '../redis/redis-failure.policy';
-import { BUDGET_TTL_SECONDS, RedisKeys, monthBucket } from '../redis/redis.constants';
+import {
+  BUDGET_TTL_SECONDS,
+  DAILY_BUDGET_TTL_SECONDS,
+  RedisKeys,
+  dayBucket,
+  monthBucket,
+} from '../redis/redis.constants';
 import { RedisService } from '../redis/redis.service';
 import type { LuaScript } from '../redis/redis.service';
 
@@ -14,7 +20,9 @@ import type { LuaScript } from '../redis/redis.service';
  *   reserved      money held for requests still in flight
  *   remaining     monthlyLimit - currentUsage - reserved, kept up to date by every script
  *
- * All amounts are micro-dollars.
+ * All amounts are micro-dollars. The same hash shape, and the same scripts, serve a tenant's optional
+ * daily budget (`tenant:{T}:budget:daily:{YYYYMMDD}`), just under a different key and a shorter TTL; see
+ * `BudgetPeriod`.
  */
 export interface BudgetStatus {
   allowed: boolean;
@@ -26,11 +34,31 @@ export interface BudgetStatus {
   bypassed: boolean;
 }
 
+/** Which budget a call is against. Plans without a daily cap never use `'day'`. */
+export type BudgetPeriod = 'month' | 'day';
+
 /** Money held for one in-flight request. Pass it back to release or settle it. */
 export interface BudgetReservation {
   tenantId: string;
+  /** The bucket the reservation was made in (a `monthBucket` or, for `period: 'day'`, a `dayBucket`). */
   month: string;
   amountMicroUsd: number;
+  /** Defaults to `'month'`, so a reservation built before this field existed is still read correctly. */
+  period?: BudgetPeriod;
+}
+
+function redisKeyFor(tenantId: string, bucket: string, period: BudgetPeriod = 'month'): string {
+  return period === 'day'
+    ? RedisKeys.dailyBudget(tenantId, bucket)
+    : RedisKeys.budget(tenantId, bucket);
+}
+
+function ttlFor(period: BudgetPeriod): number {
+  return period === 'day' ? DAILY_BUDGET_TTL_SECONDS : BUDGET_TTL_SECONDS;
+}
+
+function bucketFor(period: BudgetPeriod, now: Date): string {
+  return period === 'day' ? dayBucket(now) : monthBucket(now);
 }
 
 // Every script ends by recomputing `remaining`, so the four fields always agree.
@@ -150,6 +178,7 @@ export class BudgetService {
     monthlyLimitMicroUsd: number,
     amountMicroUsd = 0,
     now: Date = new Date(),
+    period: BudgetPeriod = 'month',
   ): Promise<BudgetStatus> {
     const bypass: BudgetStatus = {
       allowed: true,
@@ -165,7 +194,7 @@ export class BudgetService {
         toStatus(
           (await this.redis.run(
             CHECK,
-            [RedisKeys.budget(tenantId, monthBucket(now))],
+            [redisKeyFor(tenantId, bucketFor(period, now), period)],
             [monthlyLimitMicroUsd, amountMicroUsd],
           )) as ScriptReply,
         ),
@@ -174,8 +203,8 @@ export class BudgetService {
   }
 
   /**
-   * Holds `amountMicroUsd` against the month. Throws 402 when it does not fit. Returns null when the
-   * gateway is failing open because Redis is down.
+   * Holds `amountMicroUsd` against the month (or, with `period: 'day'`, against the day). Throws 402 when
+   * it does not fit. Returns null when the gateway is failing open because Redis is down.
    */
   async reserveBudget(
     tenantId: string,
@@ -183,16 +212,17 @@ export class BudgetService {
     amountMicroUsd: number,
     context: { requestId?: string } = {},
     now: Date = new Date(),
+    period: BudgetPeriod = 'month',
   ): Promise<BudgetReservation | null> {
-    const month = monthBucket(now);
+    const bucket = bucketFor(period, now);
     const status = await this.policy.guard(
       'budget_reserve',
       async () =>
         toStatus(
           (await this.redis.run(
             RESERVE,
-            [RedisKeys.budget(tenantId, month)],
-            [monthlyLimitMicroUsd, amountMicroUsd, BUDGET_TTL_SECONDS],
+            [redisKeyFor(tenantId, bucket, period)],
+            [monthlyLimitMicroUsd, amountMicroUsd, ttlFor(period)],
           )) as ScriptReply,
         ),
       null,
@@ -205,6 +235,7 @@ export class BudgetService {
           event: 'budget_blocked',
           requestId: context.requestId,
           tenantId,
+          period,
           requested: amountMicroUsd,
           remaining: status.remaining,
           monthlyLimit: status.monthlyLimit,
@@ -214,16 +245,17 @@ export class BudgetService {
       );
       throw new BudgetExceededException();
     }
-    return { tenantId, month, amountMicroUsd };
+    return { tenantId, month: bucket, amountMicroUsd, period };
   }
 
   /** The request did not spend anything (it failed, or was refused later): return the hold. */
   async releaseBudget(reservation: BudgetReservation | null): Promise<void> {
     if (!reservation) return;
+    const period = reservation.period ?? 'month';
     await this.quietly('budget_release', () =>
       this.redis.run(
         RELEASE,
-        [RedisKeys.budget(reservation.tenantId, reservation.month)],
+        [redisKeyFor(reservation.tenantId, reservation.month, period)],
         [reservation.amountMicroUsd],
       ),
     );
@@ -232,18 +264,27 @@ export class BudgetService {
   /** The request finished: replace the hold with what it actually cost. */
   async updateUsage(reservation: BudgetReservation | null, actualMicroUsd: number): Promise<void> {
     if (!reservation) return;
+    const period = reservation.period ?? 'month';
     await this.quietly('budget_update_usage', () =>
       this.redis.run(
         SETTLE,
-        [RedisKeys.budget(reservation.tenantId, reservation.month)],
-        [reservation.amountMicroUsd, BUDGET_TTL_SECONDS, actualMicroUsd],
+        [redisKeyFor(reservation.tenantId, reservation.month, period)],
+        [reservation.amountMicroUsd, ttlFor(period), actualMicroUsd],
       ),
     );
   }
 
-  /** The figures as stored, for operators and tests. Null if the tenant has no budget key this month. */
-  async snapshot(tenantId: string, now: Date = new Date()): Promise<Record<string, number> | null> {
-    const hash = await this.redis.client.hgetall(RedisKeys.budget(tenantId, monthBucket(now)));
+  /**
+   * The figures as stored, for operators and tests. Null if the tenant has no budget key for that period.
+   */
+  async snapshot(
+    tenantId: string,
+    now: Date = new Date(),
+    period: BudgetPeriod = 'month',
+  ): Promise<Record<string, number> | null> {
+    const hash = await this.redis.client.hgetall(
+      redisKeyFor(tenantId, bucketFor(period, now), period),
+    );
     if (Object.keys(hash).length === 0) return null;
     return Object.fromEntries(Object.entries(hash).map(([field, value]) => [field, Number(value)]));
   }

@@ -31,3 +31,15 @@ export function lookupModelInfo(provider: ProviderId, model: string): ModelInfo 
   const known = MODELS[provider][model];
   return known ? { name: model, ...known } : undefined;
 }
+
+/** Whether a provider recognises a model name on its own, without asking the database catalogue. */
+export function modelIsKnown(provider: ProviderId, model: string): boolean {
+  return lookupModelInfo(provider, model) !== undefined;
+}
+
+/** Human-readable name for logs, UI and error messages. The short `id` stays the stable key. */
+export const PROVIDER_DISPLAY_NAMES: Record<ProviderId, string> = {
+  gemini: 'Google Gemini',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+};

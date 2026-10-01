@@ -13,5 +13,8 @@ export interface ChatCompletionResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
+    /** USD, as a decimal string so no precision is lost; "0" on a free-tier provider. Tollbooth-specific,
+     *  additive to the OpenAI shape (see docs/architecture/usage-cost-engine.md). */
+    estimated_cost: string;
   };
 }

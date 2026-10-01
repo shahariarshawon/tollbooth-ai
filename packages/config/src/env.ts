@@ -83,9 +83,19 @@ const envSchema = z.object({
     blankToUndefined,
     z.coerce.number().int().min(100).default(30_000),
   ),
+  /** How long the gateway waits for one provider attempt before giving up on it. */
   GATEWAY_PROVIDER_TIMEOUT_MS: z.preprocess(
     blankToUndefined,
-    z.coerce.number().int().min(1000).default(60_000),
+    z.coerce.number().int().min(1000).default(30_000),
+  ),
+  /**
+   * Extra attempts for a transient provider failure (timeout, provider rate limit) before the gateway
+   * gives up and answers 503. 0 disables retrying. Never retried: bad credentials or a request the
+   * provider rejected outright, and an outage, which the circuit breaker handles instead.
+   */
+  GATEWAY_MAX_PROVIDER_RETRIES: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(0).default(3),
   ),
 });
 

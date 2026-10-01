@@ -10,6 +10,9 @@ export const COUNTER_TTL_SECONDS = 60;
 /** A monthly budget key outlives its month a little, so late settlements still find it. */
 export const BUDGET_TTL_SECONDS = 40 * 24 * 60 * 60;
 
+/** A daily budget key only needs to outlive its day by a little, for the same reason. */
+export const DAILY_BUDGET_TTL_SECONDS = 3 * 24 * 60 * 60;
+
 /** `2026-10-01T09:30:12.345Z` -> `202610010930`. UTC, so every gateway instance agrees on the minute. */
 export function minuteBucket(date: Date): string {
   return date.toISOString().slice(0, 16).replace(/[-T:]/g, '');
@@ -18,6 +21,11 @@ export function minuteBucket(date: Date): string {
 /** `2026-10-01T...` -> `202610`. */
 export function monthBucket(date: Date): string {
   return date.toISOString().slice(0, 7).replace('-', '');
+}
+
+/** `2026-10-01T...` -> `20261001`. UTC, so every gateway instance agrees on the day. */
+export function dayBucket(date: Date): string {
+  return date.toISOString().slice(0, 10).replace(/-/g, '');
 }
 
 /** Whole seconds until the current minute ends; at least 1 so Retry-After is never 0. */
@@ -37,6 +45,7 @@ export function secondsUntilNextMinute(date: Date): number {
  *   tenant:{T}:tokens:202610010930            tokens this minute, whole tenant
  *   tenant:{T}:apikey:K:tokens:202610010930   tokens this minute, one API key
  *   tenant:{T}:budget:202610                  monthly budget hash
+ *   tenant:{T}:budget:daily:20261001           daily budget hash (only for a plan with a daily cap)
  *   provider:openai:circuit                   circuit breaker state (JSON)
  */
 export const RedisKeys = {
@@ -47,5 +56,6 @@ export const RedisKeys = {
   apiKeyTokens: (tenantId: string, apiKeyId: string, minute: string) =>
     `tenant:{${tenantId}}:apikey:${apiKeyId}:tokens:${minute}`,
   budget: (tenantId: string, month: string) => `tenant:{${tenantId}}:budget:${month}`,
+  dailyBudget: (tenantId: string, day: string) => `tenant:{${tenantId}}:budget:daily:${day}`,
   circuit: (provider: string) => `provider:${provider.toLowerCase()}:circuit`,
 };

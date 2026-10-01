@@ -1,6 +1,6 @@
 import { BudgetService } from '../../src/budget/budget.service';
 import { setLogSink } from '../../src/common/logging/structured-logger';
-import { RedisKeys, monthBucket } from '../../src/redis/redis.constants';
+import { RedisKeys, dayBucket, monthBucket } from '../../src/redis/redis.constants';
 import { DEAD_REDIS, createRedisHarness } from '../support/redis-harness';
 import type { RedisHarness } from '../support/redis-harness';
 
@@ -30,7 +30,12 @@ describe('Budget counters (integration)', () => {
     const tenantId = harness.tenantId();
     const reservation = await budget.reserveBudget(tenantId, LIMIT, 300_000, {}, NOW);
 
-    expect(reservation).toEqual({ tenantId, month: '202610', amountMicroUsd: 300_000 });
+    expect(reservation).toEqual({
+      tenantId,
+      month: '202610',
+      amountMicroUsd: 300_000,
+      period: 'month',
+    });
     expect(await budget.snapshot(tenantId, NOW)).toEqual({
       monthlyLimit: LIMIT,
       currentUsage: 0,
@@ -202,6 +207,52 @@ describe('Budget counters (integration)', () => {
     expect(await budget.snapshot(tenantId, NOW)).toBeNull();
     await budget.releaseBudget(null);
     await budget.updateUsage(null, 10);
+  });
+
+  describe('daily budget (period: "day"), Phase 7 Task 9', () => {
+    it('uses its own key and TTL, independent of the monthly budget', async () => {
+      const tenantId = harness.tenantId();
+
+      const reservation = await budget.reserveBudget(tenantId, LIMIT, 300_000, {}, NOW, 'day');
+
+      expect(reservation).toEqual({
+        tenantId,
+        month: dayBucket(NOW),
+        amountMicroUsd: 300_000,
+        period: 'day',
+      });
+      const key = RedisKeys.dailyBudget(tenantId, dayBucket(NOW));
+      expect(key).toBe(`tenant:{${tenantId}}:budget:daily:20261015`);
+      expect(await harness.redis.client.exists(RedisKeys.budget(tenantId, monthBucket(NOW)))).toBe(
+        0,
+      );
+      expect(await budget.snapshot(tenantId, NOW, 'day')).toMatchObject({ reserved: 300_000 });
+      expect(await budget.snapshot(tenantId, NOW)).toBeNull(); // the monthly key, untouched
+    });
+
+    it('rejects once the day is exhausted, independent of how much of the month is left', async () => {
+      const tenantId = harness.tenantId();
+      await budget.reserveBudget(tenantId, LIMIT, LIMIT, {}, NOW, 'day');
+
+      await expect(budget.reserveBudget(tenantId, LIMIT, 1, {}, NOW, 'day')).rejects.toMatchObject({
+        status: 402,
+      });
+      // The month (a much bigger LIMIT would be typical, but even the same limit) is a separate pool.
+      await expect(budget.reserveBudget(tenantId, LIMIT, 1, {}, NOW)).resolves.toMatchObject({
+        period: 'month',
+      });
+    });
+
+    it('settles and releases a daily reservation against its own key', async () => {
+      const tenantId = harness.tenantId();
+      const reservation = await budget.reserveBudget(tenantId, LIMIT, 400_000, {}, NOW, 'day');
+      await budget.updateUsage(reservation, 250_000);
+
+      expect(await budget.snapshot(tenantId, NOW, 'day')).toMatchObject({
+        currentUsage: 250_000,
+        reserved: 0,
+      });
+    });
   });
 
   describe('when Redis is down', () => {

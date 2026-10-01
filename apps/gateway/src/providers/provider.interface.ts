@@ -88,11 +88,24 @@ export interface AIProvider {
   /** False when credentials are missing, so the gateway can report the provider as unavailable. */
   isConfigured(): boolean;
 
+  /** Human-readable name for logs, error messages and the dashboard. `id` stays the short, stable key. */
+  getProviderName(): string;
+
   /** Sends the conversation and returns the reply in the neutral shape. Throws ProviderError on failure. */
   chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult>;
 
+  /**
+   * Streaming is not implemented yet (see "What is not done" in docs/architecture/provider-router.md).
+   * Every provider still exposes the method, so a caller gets one consistent, classified rejection
+   * (`ProviderError('bad_request', ...)`) instead of each adapter failing differently.
+   */
+  streamCompletion(request: ChatCompletionRequest): Promise<never>;
+
   /** Static facts about a model (context window, output limit), or undefined for models it does not know. */
   getModelInfo(model: string): ModelInfo | undefined;
+
+  /** True when this provider recognises the model by itself, independent of the database catalogue. */
+  validateModel(model: string): boolean;
 
   /**
    * Token counts for a finished call: what the provider reported when it reported anything (each provider

@@ -6,7 +6,7 @@ import { RequestRepository } from './request.repository';
 
 export type { TokenUsage };
 
-interface RecordInput {
+export interface RecordInput {
   auth: ApiKeyAuth;
   provider: ProviderType;
   model: string;
@@ -15,10 +15,12 @@ interface RecordInput {
 
 /**
  * Pipeline step 9: keep a record of every call that reached a provider. The record is the source for
- * usage tracking today and for cost, billing and analytics later.
+ * usage tracking and for the usage ledger (see `../usage`).
  *
  * A failure to save must not turn a successful completion into an error for the caller, who has
- * already been served (and charged by the provider). It is logged loudly instead.
+ * already been served (and charged by the provider). It is logged loudly instead, and `undefined` is
+ * returned so a caller that wants to link something to this record (the usage ledger) knows there is
+ * nothing to link to.
  */
 @Injectable()
 export class RequestService {
@@ -26,9 +28,10 @@ export class RequestService {
 
   constructor(private readonly repository: RequestRepository) {}
 
+  /** Returns the new `ai_requests` row's id, or undefined if the save itself failed. */
   recordSuccess(
     input: RecordInput & { usage: TokenUsage; estimatedCostUsd: string },
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     return this.save(input, {
       ...input.usage,
       status: 'SUCCESS',
@@ -38,7 +41,7 @@ export class RequestService {
 
   recordFailure(
     input: RecordInput & { requestTokens: number; errorMessage: string },
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     return this.save(input, {
       requestTokens: input.requestTokens,
       responseTokens: 0,
@@ -55,9 +58,9 @@ export class RequestService {
       errorMessage?: string;
       estimatedCostUsd?: string;
     },
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     try {
-      await this.repository.create({
+      return await this.repository.create({
         tenantId: input.auth.tenantId,
         projectId: input.auth.projectId,
         apiKeyId: input.auth.apiKeyId,
@@ -71,6 +74,7 @@ export class RequestService {
         `Failed to save request record (tenantId=${input.auth.tenantId}, model=${input.model})`,
         error instanceof Error ? error.stack : String(error),
       );
+      return undefined;
     }
   }
 }

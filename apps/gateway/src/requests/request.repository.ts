@@ -23,8 +23,9 @@ export interface NewAiRequest {
 export class RequestRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(request: NewAiRequest): Promise<void> {
-    await this.prisma.aiRequest.create({
+  /** Returns the new row's id, so a caller (the usage ledger) can link an entry to it. */
+  async create(request: NewAiRequest): Promise<string> {
+    const created = await this.prisma.aiRequest.create({
       data: {
         tenantId: request.tenantId,
         projectId: request.projectId,
@@ -39,6 +40,8 @@ export class RequestRepository {
         status: request.status,
         errorMessage: request.errorMessage ?? null,
       },
+      select: { id: true },
     });
+    return created.id;
   }
 }

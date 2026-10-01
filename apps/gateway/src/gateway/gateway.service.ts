@@ -13,10 +13,10 @@ import type {
   ModelInfo,
 } from '../providers/provider.interface';
 import { ProviderRouter } from '../providers/provider.router';
-import { RequestService } from '../requests/request.service';
 import type { TokenUsage } from '../providers/provider.interface';
 import { TokenCounter } from '../tokens/token-counter.service';
 import { TrafficControlService } from '../traffic/traffic-control.service';
+import { UsageService } from '../usage/usage.service';
 
 export interface PipelineContext {
   requestId: string;
@@ -37,7 +37,7 @@ export class GatewayService {
 
   constructor(
     private readonly router: ProviderRouter,
-    private readonly requests: RequestService,
+    private readonly usage: UsageService,
     private readonly tokens: TokenCounter,
     private readonly traffic: TrafficControlService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -91,7 +91,7 @@ export class GatewayService {
         admission,
         failure.kind === 'bad_request' ? 'caller_error' : 'provider_failure',
       );
-      await this.requests.recordFailure({
+      await this.usage.recordFailure({
         auth: context.auth,
         provider: model.providerType,
         model: model.name,
@@ -115,17 +115,18 @@ export class GatewayService {
       inputTokens: usage.requestTokens,
       outputTokens: usage.responseTokens,
     });
-    await this.requests.recordSuccess({
+    // Micro-dollars to dollars, as a decimal string: exact, and 0 on a free tier.
+    const estimatedCostUsd = (costMicroUsd / 1_000_000).toFixed(8);
+    await this.usage.recordSuccess({
       auth: context.auth,
       provider: model.providerType,
       model: model.name,
       latencyMs,
       usage,
-      // Micro-dollars to dollars, as a decimal string: exact, and 0 on a free tier.
-      estimatedCostUsd: (costMicroUsd / 1_000_000).toFixed(8),
+      estimatedCostUsd,
     });
 
-    return this.toResponse(result, usage);
+    return this.toResponse(result, usage, estimatedCostUsd);
   }
 
   private toProviderRequest(dto: ChatCompletionRequestDto): ChatCompletionRequest {
@@ -169,7 +170,11 @@ export class GatewayService {
     }
   }
 
-  private toResponse(result: ChatCompletionResult, usage: TokenUsage): ChatCompletionResponse {
+  private toResponse(
+    result: ChatCompletionResult,
+    usage: TokenUsage,
+    estimatedCostUsd: string,
+  ): ChatCompletionResponse {
     return {
       id: result.id,
       object: 'chat.completion',
@@ -184,6 +189,9 @@ export class GatewayService {
         prompt_tokens: usage.requestTokens,
         completion_tokens: usage.responseTokens,
         total_tokens: usage.totalTokens,
+        // Additive to the OpenAI shape: existing clients that only read the three fields above are
+        // unaffected. 0 on a free tier (see budget/cost-estimator.ts).
+        estimated_cost: estimatedCostUsd,
       },
     };
   }

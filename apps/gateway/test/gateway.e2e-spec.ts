@@ -397,7 +397,8 @@ describe('Chat completions (e2e)', () => {
       ctx.fake.behavior = 'hang';
       const started = Date.now();
       const res = await post().expect(503);
-      expect(Date.now() - started).toBeLessThan(5000);
+      // A timeout is retried (GATEWAY_MAX_PROVIDER_RETRIES), so this is a few timeouts, not one.
+      expect(Date.now() - started).toBeLessThan(8000);
       expect(res.body.error.code).toBe('provider_unavailable');
       const record = (await records())[0];
       expect(record?.status).toBe('FAILED');
