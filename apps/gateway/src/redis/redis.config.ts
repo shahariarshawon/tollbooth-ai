@@ -46,7 +46,7 @@ export function resolveRedisSettings(env: RedisEnv): RedisSettings {
     port: url.port ? Number(url.port) : 6379,
     ...(url.username && { username: decodeURIComponent(url.username) }),
     ...(url.password && { password: decodeURIComponent(url.password) }),
-    tls: url.protocol === 'rediss:' || env.REDIS_TLS,
+    tls: url.protocol === 'rediss:' || env.REDIS_TLS || url.hostname.includes('upstash.io'),
     db: url.pathname.length > 1 ? Number(url.pathname.slice(1)) || 0 : 0,
     commandTimeoutMs: env.REDIS_COMMAND_TIMEOUT_MS,
   };
