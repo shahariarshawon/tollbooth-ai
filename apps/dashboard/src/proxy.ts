@@ -22,3 +22,7 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = { matcher: ['/dashboard/:path*', '/login'] };
+
+export const middleware = proxy;
+export default proxy;
+

@@ -41,6 +41,7 @@ export function applySession(response: NextResponse, tokens: TokenSet): void {
   });
   response.cookies.set(COOKIE_NAMES.user, JSON.stringify(tokens.user), {
     ...base,
+    httpOnly: false,
     path: '/',
     maxAge: REFRESH_MAX_AGE,
   });
@@ -50,6 +51,7 @@ export function applySession(response: NextResponse, tokens: TokenSet): void {
 export function updateUserCookie(response: NextResponse, user: SessionUser): void {
   response.cookies.set(COOKIE_NAMES.user, JSON.stringify(user), {
     ...base,
+    httpOnly: false,
     path: '/',
     maxAge: REFRESH_MAX_AGE,
   });

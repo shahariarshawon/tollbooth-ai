@@ -43,7 +43,7 @@ export function LoginForm({ redirectTo = '/dashboard' }: { redirectTo?: string }
     setFormError(null);
     try {
       await login(values);
-      router.replace(redirectTo);
+      window.location.href = redirectTo;
     } catch (error) {
       setFormError(messageFor(error));
     }
