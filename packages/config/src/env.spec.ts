@@ -135,6 +135,42 @@ describe('redis and traffic settings', () => {
   });
 });
 
+describe('provider settings', () => {
+  it('makes Gemini the default provider with the public endpoints as defaults', () => {
+    const config = loadConfig(validEnv);
+    expect(config.GATEWAY_DEFAULT_PROVIDER).toBe('gemini');
+    expect(config.GOOGLE_AI_BASE_URL).toBe('https://generativelanguage.googleapis.com/v1beta');
+    expect(config.ANTHROPIC_BASE_URL).toBe('https://api.anthropic.com');
+  });
+
+  it('needs no provider key to load, so no provider is mandatory', () => {
+    const config = loadConfig({ ...validEnv, GOOGLE_AI_API_KEY: '', OPENAI_API_KEY: '' });
+    expect(config.GOOGLE_AI_API_KEY).toBeUndefined();
+    expect(config.OPENAI_API_KEY).toBeUndefined();
+    expect(config.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('reads provider keys and a different default provider', () => {
+    const config = loadConfig({
+      ...validEnv,
+      GOOGLE_AI_API_KEY: 'g-key',
+      GATEWAY_DEFAULT_PROVIDER: 'openai',
+      GOOGLE_AI_BASE_URL: 'http://localhost:4020/v1beta',
+    });
+    expect(config).toMatchObject({
+      GOOGLE_AI_API_KEY: 'g-key',
+      GATEWAY_DEFAULT_PROVIDER: 'openai',
+      GOOGLE_AI_BASE_URL: 'http://localhost:4020/v1beta',
+    });
+  });
+
+  it('rejects an unknown default provider', () => {
+    expect(() => loadConfig({ ...validEnv, GATEWAY_DEFAULT_PROVIDER: 'cohere' })).toThrow(
+      /GATEWAY_DEFAULT_PROVIDER/,
+    );
+  });
+});
+
 describe('durationToSeconds', () => {
   it.each([
     ['30s', 30],

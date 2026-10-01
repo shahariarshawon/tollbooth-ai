@@ -1,7 +1,9 @@
 # Gateway API
 
 The gateway (`apps/gateway`) is an OpenAI-compatible front door for AI models. A developer swaps the base
-URL and API key in an existing OpenAI client and keeps the rest of their code.
+URL and API key in an existing OpenAI client and keeps the rest of their code. Behind it, a provider router sends
+each request to an AI provider: **Gemini is the active provider**, and OpenAI and Anthropic are implemented and
+ready to switch on. See [provider-architecture.md](../architecture/provider-architecture.md).
 
 | Setting  | OpenAI                      | Tollbooth AI                           |
 | -------- | --------------------------- | -------------------------------------- |
@@ -26,21 +28,21 @@ The response always carries an `X-Request-ID` header. Quote it when reporting a 
 
 **Request body**
 
-| Field                | Type                          | Notes                                                 |
-| -------------------- | ----------------------------- | ----------------------------------------------------- |
-| `model`              | string, required              | A model in the catalogue, for example `gpt-4`         |
-| `messages`           | array, required               | 1 to 500 items of `{ role, content, name? }`          |
-| `messages[].role`    | `system`, `user`, `assistant` |                                                       |
-| `messages[].content` | string                        | Plain text, up to 200,000 characters                  |
-| `temperature`        | number 0 to 2                 | optional                                              |
-| `top_p`              | number 0 to 1                 | optional                                              |
-| `max_tokens`         | integer >= 1                  | optional; at most `GATEWAY_MAX_TOKENS` (default 4096) |
-| `stop`               | string or string[]            | optional; up to 4 sequences                           |
-| `presence_penalty`   | number -2 to 2                | optional                                              |
-| `frequency_penalty`  | number -2 to 2                | optional                                              |
-| `n`                  | integer, only `1`             | optional                                              |
-| `user`               | string                        | optional end-user identifier, passed to the provider  |
-| `stream`             | boolean                       | `true` is not supported yet and is rejected           |
+| Field                | Type                          | Notes                                                    |
+| -------------------- | ----------------------------- | -------------------------------------------------------- |
+| `model`              | string, required              | A model in the catalogue, for example `gemini-2.0-flash` |
+| `messages`           | array, required               | 1 to 500 items of `{ role, content, name? }`             |
+| `messages[].role`    | `system`, `user`, `assistant` |                                                          |
+| `messages[].content` | string                        | Plain text, up to 200,000 characters                     |
+| `temperature`        | number 0 to 2                 | optional                                                 |
+| `top_p`              | number 0 to 1                 | optional                                                 |
+| `max_tokens`         | integer >= 1                  | optional; at most `GATEWAY_MAX_TOKENS` (default 4096)    |
+| `stop`               | string or string[]            | optional; up to 4 sequences                              |
+| `presence_penalty`   | number -2 to 2                | optional                                                 |
+| `frequency_penalty`  | number -2 to 2                | optional                                                 |
+| `n`                  | integer, only `1`             | optional                                                 |
+| `user`               | string                        | optional end-user identifier, passed to the provider     |
+| `stream`             | boolean                       | `true` is not supported yet and is rejected              |
 
 The body is limited to 1 MB. **Parameters not listed here are rejected** with `unknown_parameter` rather than
 silently ignored, so a client that sends `tools` or `response_format` learns immediately that they are not
@@ -53,7 +55,7 @@ curl http://localhost:3000/v1/chat/completions \
   -H "Authorization: Bearer $TOLLBOOTH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4",
+    "model": "gemini-2.0-flash",
     "messages": [{ "role": "user", "content": "Hello" }],
     "temperature": 0.7
   }'
@@ -66,7 +68,7 @@ curl http://localhost:3000/v1/chat/completions \
   "id": "chatcmpl-9xY2...",
   "object": "chat.completion",
   "created": 1790000000,
-  "model": "gpt-4-0613",
+  "model": "gemini-2.0-flash-001",
   "choices": [
     {
       "index": 0,
@@ -92,7 +94,7 @@ const client = new OpenAI({
 });
 
 const reply = await client.chat.completions.create({
-  model: 'gpt-4',
+  model: 'gemini-2.0-flash',
   messages: [{ role: 'user', content: 'Hello' }],
 });
 ```
@@ -101,7 +103,7 @@ const reply = await client.chat.completions.create({
 from openai import OpenAI
 
 client = OpenAI(api_key="tb_...", base_url="http://localhost:3000/v1")
-client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "Hello"}])
+client.chat.completions.create(model="gemini-2.0-flash", messages=[{"role": "user", "content": "Hello"}])
 ```
 
 Errors arrive as the SDK's own exceptions (`BadRequestError`, `AuthenticationError`, and so on).
@@ -139,11 +141,11 @@ Request
   6. budget pre-check      has the tenant already used its whole month?         -> 402   (Redis)
   7. request validation    DTO rules, unknown fields rejected, max_tokens ceiling, stream refused
   8. model validation      model exists and is active in the catalogue
-  9. provider selection    provider enabled, implemented and configured
+  9. provider routing      provider enabled in the database, implemented and configured
  10. token quota           reserve estimated tokens per minute                  -> 429   (Redis)
  11. budget reservation    hold the worst-case cost of this request             -> 402   (Redis)
  12. circuit breaker       is the provider healthy?                             -> 503   (Redis)
- 13. provider call         OpenAI SDK, normalised to a provider-neutral result
+ 13. provider call         the provider adapter (Gemini), normalised to a provider-neutral result
  14. update counters       settle tokens and budget to real usage, update the circuit
  15. save request record   ai_requests row: tenant, project, key, provider, model, tokens, latency, status
  16. respond               OpenAI-shaped JSON
@@ -226,7 +228,7 @@ Each request writes one JSON line to stdout when it finishes, including rejected
   "statusCode": 200,
   "tenantId": "9e3c...",
   "projectId": "c4c5...",
-  "model": "gpt-4",
+  "model": "gemini-2.0-flash",
   "latency": 812
 }
 ```
@@ -245,38 +247,46 @@ Others: `token_quota_blocked`, `circuit_state_changed`, `circuit_open_rejected`,
 
 ## Configuration
 
-| Variable                      | Default                     | Notes                                                      |
-| ----------------------------- | --------------------------- | ---------------------------------------------------------- |
-| `OPENAI_API_KEY`              | none                        | Without it OpenAI models answer `503 provider_unavailable` |
-| `OPENAI_BASE_URL`             | `https://api.openai.com/v1` | Any OpenAI-compatible server                               |
-| `GATEWAY_PORT`                | falls back to `PORT`        |                                                            |
-| `GATEWAY_MAX_TOKENS`          | `4096`                      | Ceiling for a request's `max_tokens`                       |
-| `GATEWAY_PROVIDER_TIMEOUT_MS` | `60000`                     | After this the call fails as `provider_unavailable`        |
-| `DATABASE_URL`                | none                        | Required                                                   |
+| Variable                                  | Default                                            | Notes                                                                                   |
+| ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `GOOGLE_AI_API_KEY`                       | none                                               | Gemini, the active provider. Without it Gemini models answer `503 provider_unavailable` |
+| `GOOGLE_AI_BASE_URL`                      | `https://generativelanguage.googleapis.com/v1beta` | Gemini endpoint                                                                         |
+| `GATEWAY_DEFAULT_PROVIDER`                | `gemini`                                           | Which provider serves a model offered by several active ones                            |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`       | none, `https://api.openai.com/v1`                  | Optional. OpenAI is ready but switched off by default                                   |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` | none, `https://api.anthropic.com`                  | Optional. Anthropic is ready but switched off by default                                |
+| `GATEWAY_PORT`                            | falls back to `PORT`                               |                                                                                         |
+| `GATEWAY_MAX_TOKENS`                      | `4096`                                             | Ceiling for a request's `max_tokens`                                                    |
+| `GATEWAY_PROVIDER_TIMEOUT_MS`             | `60000`                                            | After this the call fails as `provider_unavailable`                                     |
+| `DATABASE_URL`                            | none                                               | Required                                                                                |
 
-Models come from the `ai_models` table (seed: `gpt-4`, `gpt-4o`, `gpt-4o-mini`, `claude-sonnet-4-5`). A model
-is served only when it is active and its provider is enabled, implemented and configured. `claude-sonnet-4-5`
-exists in the catalogue but has no provider implementation yet, so it answers `503`.
+Models come from the `ai_models` table. The seed has `gemini-2.0-flash`, `gemini-2.0-flash-lite`,
+`gemini-2.5-flash` and `gemini-2.5-pro` (Gemini, active), plus `gpt-4`, `gpt-4o`, `gpt-4o-mini` (OpenAI) and
+`claude-sonnet-4-5` (Anthropic), which answer `503 provider_unavailable` until their provider is switched on.
+A model is served only when it is active and its provider is `ACTIVE` in `ai_providers`, implemented, and
+configured with a key. The gateway also refuses, without calling the provider, a `max_tokens` above what the
+model can produce (`max_tokens_exceeded`) and a conversation longer than its context window
+(`context_length_exceeded`), for the models it knows the limits of.
 
 ## Trying it locally
 
 ```bash
 pnpm infra:up && pnpm db:migrate && pnpm db:seed
-OPENAI_API_KEY=sk-... pnpm --filter @tollbooth/gateway dev      # http://localhost:3000
+GOOGLE_AI_API_KEY=... pnpm --filter @tollbooth/gateway dev      # http://localhost:3000
 pnpm gateway:test                                               # sends a request and shows the result
 ```
 
-`pnpm gateway:test` issues a short-lived development key for the seeded project (or uses
-`TOLLBOOTH_API_KEY`), prints the reply, token counts and latency, shows the saved request record, and checks
-that a bad key and an unknown model are refused. To run without an OpenAI account, start the bundled fake:
+(or put `GOOGLE_AI_API_KEY` in `.env`; a free key is available from Google AI Studio.) `pnpm gateway:test` issues a
+short-lived development key for the seeded project (or uses `TOLLBOOTH_API_KEY`), prints the reply, token counts
+and latency, shows the saved request record, and checks that a bad key and an unknown model are refused. To run
+without a Google account, start the bundled fake Gemini:
 
 ```bash
-pnpm exec tsx apps/gateway/test/support/fake-openai.ts 4010
-OPENAI_API_KEY=any OPENAI_BASE_URL=http://127.0.0.1:4010/v1 pnpm --filter @tollbooth/gateway dev
+pnpm exec tsx apps/gateway/test/support/fake-gemini.ts 4020
+GOOGLE_AI_API_KEY=AIza-test-key-not-real GOOGLE_AI_BASE_URL=http://127.0.0.1:4020/v1beta pnpm --filter @tollbooth/gateway dev
 ```
 
 ## Not included yet
 
-Streaming responses, other endpoints (`/v1/models`, embeddings), other providers, provider failover, cost
-calculation for billing, usage events and content scanning. The request and provider abstractions
+Streaming responses, other endpoints (`/v1/models`, embeddings), provider failover, billing (the cost stored
+with each request is an estimate, there is no ledger), usage events and content scanning. The request and provider abstractions
 are shaped so each can be added without changing the endpoint.

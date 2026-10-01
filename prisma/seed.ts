@@ -17,18 +17,43 @@ function hashApiKey(rawKey: string): string {
   return createHash('sha256').update(rawKey).digest('hex');
 }
 
+/**
+ * Gemini is the active provider. OpenAI and Anthropic stay in the catalogue, implemented in the gateway
+ * and ready to switch on, but DISABLED: the router will not send them traffic until their status is
+ * set to ACTIVE (and their API key is configured).
+ *
+ * `configuration.tier` says whether the provider account is billed: "free" (a Google AI Studio key on
+ * the free plan costs nothing) or "paid". Re-seeding never overwrites a tier you have already chosen.
+ */
+const PROVIDERS = [
+  { name: 'Google Gemini', type: ProviderType.GOOGLE, status: 'ACTIVE', defaultTier: 'free' },
+  { name: 'OpenAI', type: ProviderType.OPENAI, status: 'DISABLED', defaultTier: 'paid' },
+  { name: 'Anthropic', type: ProviderType.ANTHROPIC, status: 'DISABLED', defaultTier: 'paid' },
+] as const;
+
 async function seedProviders() {
-  const definitions = [
-    { name: 'OpenAI', type: ProviderType.OPENAI },
-    { name: 'Anthropic', type: ProviderType.ANTHROPIC },
-    { name: 'Google', type: ProviderType.GOOGLE },
-  ];
+  // Databases seeded before Gemini became the primary provider have a row called "Google".
+  const legacy = await prisma.aiProvider.findUnique({ where: { name: 'Google' } });
+  if (legacy && !(await prisma.aiProvider.findUnique({ where: { name: 'Google Gemini' } }))) {
+    await prisma.aiProvider.update({ where: { id: legacy.id }, data: { name: 'Google Gemini' } });
+  }
+
   const providers = new Map<ProviderType, string>();
-  for (const definition of definitions) {
+  for (const definition of PROVIDERS) {
+    const existing = await prisma.aiProvider.findUnique({ where: { name: definition.name } });
+    const configuration = (existing?.configuration ?? {}) as Record<string, unknown>;
     const provider = await prisma.aiProvider.upsert({
       where: { name: definition.name },
-      update: {},
-      create: definition,
+      update: {
+        status: definition.status,
+        configuration: { ...configuration, tier: configuration['tier'] ?? definition.defaultTier },
+      },
+      create: {
+        name: definition.name,
+        type: definition.type,
+        status: definition.status,
+        configuration: { tier: definition.defaultTier },
+      },
     });
     providers.set(provider.type, provider.id);
   }
@@ -36,8 +61,18 @@ async function seedProviders() {
 }
 
 async function seedModels(providers: Map<ProviderType, string>) {
-  // Prices are USD per 1,000,000 tokens and are development values, not a price list.
+  // Prices are USD per 1,000,000 tokens, at paid-tier rates, and are development values: check them
+  // against each provider's current price list before relying on them for money.
   const models = [
+    { type: ProviderType.GOOGLE, modelName: 'gemini-2.0-flash', input: '0.10', output: '0.40' },
+    {
+      type: ProviderType.GOOGLE,
+      modelName: 'gemini-2.0-flash-lite',
+      input: '0.075',
+      output: '0.30',
+    },
+    { type: ProviderType.GOOGLE, modelName: 'gemini-2.5-flash', input: '0.30', output: '2.50' },
+    { type: ProviderType.GOOGLE, modelName: 'gemini-2.5-pro', input: '1.25', output: '10.00' },
     { type: ProviderType.OPENAI, modelName: 'gpt-4', input: '30.00', output: '60.00' },
     { type: ProviderType.OPENAI, modelName: 'gpt-4o', input: '2.50', output: '10.00' },
     { type: ProviderType.OPENAI, modelName: 'gpt-4o-mini', input: '0.15', output: '0.60' },

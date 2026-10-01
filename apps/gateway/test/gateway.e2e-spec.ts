@@ -1,8 +1,10 @@
 import { setLogSink } from '../src/common/logging/structured-logger';
+import { FAKE_GEMINI_API_KEY } from './support/fake-gemini';
 import {
   bearer,
   chat,
   createFixture,
+  DEFAULT_MODEL,
   createTestContext,
   destroyTestContext,
   http,
@@ -47,9 +49,9 @@ describe('Chat completions (e2e)', () => {
       const res = await post(chat('Hello', { temperature: 0.7 })).expect(200);
 
       expect(res.body).toMatchObject({
-        id: 'chatcmpl-fake123',
+        id: 'gemini-resp-fake-123',
         object: 'chat.completion',
-        created: 1_700_000_000,
+        model: 'gemini-2.0-flash-fake',
         choices: [
           {
             index: 0,
@@ -59,7 +61,14 @@ describe('Chat completions (e2e)', () => {
         ],
         usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
       });
-      expect(typeof res.body.model).toBe('string');
+      expect(res.body.created).toBeGreaterThan(1_700_000_000);
+    });
+
+    it('is served by Gemini, the active provider', async () => {
+      await post().expect(200);
+      expect(ctx.fake.received).toHaveLength(1);
+      expect(ctx.fakes.openai.received).toHaveLength(0);
+      expect(ctx.fakes.anthropic.received).toHaveLength(0);
     });
 
     it('passes the supported parameters to the provider', async () => {
@@ -76,24 +85,29 @@ describe('Chat completions (e2e)', () => {
       ).expect(200);
 
       expect(ctx.fake.received).toHaveLength(1);
+      // Translated to the Gemini request format.
       expect(ctx.fake.received[0]?.body).toMatchObject({
-        model: 'gpt-4',
-        temperature: 0.2,
-        top_p: 0.9,
-        max_tokens: 50,
-        stop: ['END'],
-        presence_penalty: 0.5,
-        frequency_penalty: -0.5,
-        user: 'end-user-42',
-        messages: [{ role: 'user', content: 'Hi' }],
+        contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxOutputTokens: 50,
+          stopSequences: ['END'],
+          presencePenalty: 0.5,
+          frequencyPenalty: -0.5,
+        },
       });
+      expect(ctx.fake.received[0]?.url).toBe(`/v1beta/models/${DEFAULT_MODEL}:generateContent`);
     });
 
     it('authenticates to the provider with the gateway own key, never the caller key', async () => {
       await post().expect(200);
-      const sent = ctx.fake.received[0]?.headers.authorization;
-      expect(sent).toBe('Bearer sk-test-e2e-not-a-real-key');
-      expect(sent).not.toContain(fixture.key.raw);
+      const received = ctx.fake.received[0];
+      expect(received?.headers['x-goog-api-key']).toBe(FAKE_GEMINI_API_KEY);
+      const everything = JSON.stringify(received);
+      expect(everything).not.toContain(fixture.key.raw);
+      // The key travels in a header, never in the URL where logs would record it.
+      expect(received?.url).not.toContain(FAKE_GEMINI_API_KEY);
     });
 
     it('saves a request record with tenant, project, key, tokens, latency and status', async () => {
@@ -104,8 +118,8 @@ describe('Chat completions (e2e)', () => {
         tenantId: fixture.tenantId,
         projectId: fixture.projectId,
         apiKeyId: fixture.key.id,
-        provider: 'OPENAI',
-        model: 'gpt-4',
+        provider: 'GOOGLE',
+        model: DEFAULT_MODEL,
         requestTokens: 11,
         responseTokens: 7,
         totalTokens: 18,
@@ -114,8 +128,16 @@ describe('Chat completions (e2e)', () => {
       });
       expect(record?.latencyMs).toBeGreaterThanOrEqual(0);
       expect(record?.latencyMs).toBeLessThan(5000);
-      // Cost belongs to the billing phase.
-      expect(Number(record?.estimatedCost)).toBe(0);
+
+      // The cost of the call, from the model prices in the database (the test provider is on a paid tier).
+      const prices = await ctx.prisma.aiModel.findFirstOrThrow({
+        where: { modelName: DEFAULT_MODEL, provider: { type: 'GOOGLE' } },
+      });
+      const expectedMicroUsd =
+        Math.ceil(11 * Number(prices.inputTokenPrice)) +
+        Math.ceil(7 * Number(prices.outputTokenPrice));
+      expect(Number(record?.estimatedCost)).toBeCloseTo(expectedMicroUsd / 1_000_000, 8);
+      expect(Number(record?.estimatedCost)).toBeGreaterThan(0);
     });
 
     it('falls back to its own token count when the provider reports no usage', async () => {
@@ -136,8 +158,9 @@ describe('Chat completions (e2e)', () => {
       });
     });
 
-    it('accepts gpt-4o-mini style model names from the catalogue', async () => {
-      await post(chat('Hi', { model: 'gpt-4o-mini' })).expect(200);
+    it('serves any active Gemini model from the catalogue', async () => {
+      await post(chat('Hi', { model: 'gemini-2.0-flash-lite' })).expect(200);
+      await post(chat('Hi', { model: 'gemini-2.5-flash' })).expect(200);
     });
   });
 
@@ -174,7 +197,7 @@ describe('Chat completions (e2e)', () => {
           requestId,
           tenantId: fixture.tenantId,
           projectId: fixture.projectId,
-          model: 'gpt-4',
+          model: DEFAULT_MODEL,
           statusCode: 200,
           method: 'POST',
           path: '/v1/chat/completions',
@@ -211,7 +234,7 @@ describe('Chat completions (e2e)', () => {
       expect(res.body.error.code).toBe('provider_unavailable');
     });
 
-    it('answers 503 for a model whose provider has no implementation yet', async () => {
+    it('answers 503 for a model whose provider is switched off in the database', async () => {
       const res = await post(chat('Hi', { model: 'claude-sonnet-4-5' })).expect(503);
       expect(res.body.error.code).toBe('provider_unavailable');
       expect(ctx.fake.received).toHaveLength(0);
@@ -228,17 +251,17 @@ describe('Chat completions (e2e)', () => {
   describe('request validation', () => {
     it.each([
       ['model is missing', { messages: [{ role: 'user', content: 'Hi' }] }, 'model'],
-      ['messages is missing', { model: 'gpt-4' }, 'messages'],
-      ['messages is empty', { model: 'gpt-4', messages: [] }, 'messages'],
-      ['messages is not an array', { model: 'gpt-4', messages: 'Hi' }, 'messages'],
+      ['messages is missing', { model: DEFAULT_MODEL }, 'messages'],
+      ['messages is empty', { model: DEFAULT_MODEL, messages: [] }, 'messages'],
+      ['messages is not an array', { model: DEFAULT_MODEL, messages: 'Hi' }, 'messages'],
       [
         'a message has an invalid role',
-        { model: 'gpt-4', messages: [{ role: 'robot', content: 'Hi' }] },
+        { model: DEFAULT_MODEL, messages: [{ role: 'robot', content: 'Hi' }] },
         'messages.0.role',
       ],
       [
         'a message has no content',
-        { model: 'gpt-4', messages: [{ role: 'user' }] },
+        { model: DEFAULT_MODEL, messages: [{ role: 'user' }] },
         'messages.0.content',
       ],
       ['temperature is too high', chat('Hi', { temperature: 5 }), 'temperature'],
@@ -276,7 +299,7 @@ describe('Chat completions (e2e)', () => {
 
     it('rejects unknown fields inside a message', async () => {
       const res = await post({
-        model: 'gpt-4',
+        model: DEFAULT_MODEL,
         messages: [{ role: 'user', content: 'Hi', tool_calls: [] }],
       }).expect(400);
       expect(res.body.error).toMatchObject({
@@ -311,7 +334,8 @@ describe('Chat completions (e2e)', () => {
     const leakChecks = (body: unknown) => {
       const text = JSON.stringify(body);
       expect(text).not.toContain('SECRETKEYFRAGMENT');
-      expect(text).not.toContain('sk-test');
+      expect(text).not.toContain(FAKE_GEMINI_API_KEY);
+      expect(text).not.toContain('AIza');
       expect(text).not.toMatch(/stack|node_modules|at .*\(|prisma|ECONN/i);
     };
 
@@ -326,8 +350,8 @@ describe('Chat completions (e2e)', () => {
       expect(record).toMatchObject({
         tenantId: fixture.tenantId,
         apiKeyId: fixture.key.id,
-        provider: 'OPENAI',
-        model: 'gpt-4',
+        provider: 'GOOGLE',
+        model: DEFAULT_MODEL,
         status: 'FAILED',
         errorMessage: 'unavailable',
         responseTokens: 0,
@@ -377,9 +401,7 @@ describe('Chat completions (e2e)', () => {
       expect(res.body.error.code).toBe('provider_unavailable');
       const record = (await records())[0];
       expect(record?.status).toBe('FAILED');
-      // Under Jest the SDK cannot recognise the abort (it crosses a VM realm) and reports a generic
-      // connection error; in a real process it is 'timeout'. Both mean the provider did not answer.
-      expect(record?.errorMessage).toMatch(/^(timeout|unavailable)$/);
+      expect(record?.errorMessage).toBe('timeout');
     });
 
     it('recovers on the next request after a failure', async () => {

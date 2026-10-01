@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import type { ProviderType } from '@tollbooth/database';
 import { BudgetService } from '../budget/budget.service';
 import type { BudgetReservation } from '../budget/budget.service';
 import {
@@ -12,6 +11,7 @@ import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.servic
 import { ProviderUnavailableException } from '../common/errors/traffic.exceptions';
 import { logEvent } from '../common/logging/structured-logger';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
+import type { ProviderId } from '../providers/provider.interface';
 import { TrafficLimits } from './plan-limits';
 import { TokenQuotaService } from './token-quota.service';
 import type { TokenReservation } from './token-quota.service';
@@ -19,7 +19,8 @@ import type { TokenReservation } from './token-quota.service';
 export interface AdmitInput {
   requestId: string;
   auth: ApiKeyAuth;
-  providerType: ProviderType;
+  /** Which provider will serve the call; keys the circuit breaker (`provider:gemini:circuit`). */
+  providerId: ProviderId;
   prices: ModelPrices;
   /** Tokens in the prompt, counted by the gateway. */
   inputTokens: number;
@@ -29,7 +30,7 @@ export interface AdmitInput {
 
 /** Everything held for one request between admission and completion. */
 export interface Admission {
-  providerType: ProviderType;
+  providerId: ProviderId;
   prices: ModelPrices;
   tokens: TokenReservation | null;
   budget: BudgetReservation | null;
@@ -75,14 +76,14 @@ export class TrafficControlService {
         { requestId },
       );
 
-      const decision = await this.breaker.canRequest(input.providerType);
+      const decision = await this.breaker.canRequest(input.providerId);
       if (!decision.allowed) {
         logEvent(
           {
             event: 'circuit_open_rejected',
             requestId,
             tenantId: auth.tenantId,
-            provider: input.providerType.toLowerCase(),
+            provider: input.providerId,
             state: decision.state,
             retryAfterSeconds: decision.retryAfterSeconds,
           },
@@ -95,19 +96,21 @@ export class TrafficControlService {
       throw error;
     }
 
-    return { providerType: input.providerType, prices: input.prices, tokens, budget };
+    return { providerId: input.providerId, prices: input.prices, tokens, budget };
   }
 
-  /** The provider answered: replace the estimates with real usage and tell the breaker it is healthy. */
-  async complete(admission: Admission, usage: Usage): Promise<void> {
+  /**
+   * The provider answered: replace the estimates with real usage and tell the breaker it is healthy.
+   * Returns the cost of the call in micro-dollars (0 on a free tier), so the caller can record it.
+   */
+  async complete(admission: Admission, usage: Usage): Promise<number> {
+    const cost = costMicroUsd(admission.prices, usage.inputTokens, usage.outputTokens);
     await Promise.all([
       this.tokenQuota.commit(admission.tokens, usage.inputTokens + usage.outputTokens),
-      this.budget.updateUsage(
-        admission.budget,
-        costMicroUsd(admission.prices, usage.inputTokens, usage.outputTokens),
-      ),
-      this.breaker.recordSuccess(admission.providerType),
+      this.budget.updateUsage(admission.budget, cost),
+      this.breaker.recordSuccess(admission.providerId),
     ]);
+    return cost;
   }
 
   /**
@@ -122,8 +125,8 @@ export class TrafficControlService {
       this.tokenQuota.release(admission.tokens),
       this.budget.releaseBudget(admission.budget),
       reason === 'provider_failure'
-        ? this.breaker.recordFailure(admission.providerType)
-        : this.breaker.recordSuccess(admission.providerType),
+        ? this.breaker.recordFailure(admission.providerId)
+        : this.breaker.recordSuccess(admission.providerId),
     ]);
   }
 }

@@ -35,6 +35,25 @@ export interface ChatCompletionResult {
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
 
+/** Final token counts for one call, in the same shape whichever provider served it. */
+export interface TokenUsage {
+  requestTokens: number;
+  responseTokens: number;
+  totalTokens: number;
+}
+
+/** What the gateway may know about a model without asking the provider. Prices are not here: they live in the database. */
+export interface ModelInfo {
+  name: string;
+  /** Most tokens the model accepts in the prompt. */
+  contextWindow: number;
+  /** Most tokens the model will generate in one reply. */
+  maxOutputTokens: number;
+}
+
+/** Stable short name of a provider. Used in logs and in the circuit breaker key (`provider:gemini:circuit`). */
+export type ProviderId = 'gemini' | 'openai' | 'anthropic';
+
 export type ProviderErrorKind =
   /** The request itself was rejected (bad parameters). Safe to tell the caller. */
   | 'bad_request'
@@ -56,11 +75,31 @@ export class ProviderError extends Error {
   }
 }
 
+/**
+ * What every AI provider implements. The gateway only ever talks to this interface, so supporting a new
+ * provider means writing one class and registering it; nothing in the request pipeline changes.
+ */
 export interface AIProvider {
+  /** Short stable name: `gemini`, `openai`, `anthropic`. */
+  readonly id: ProviderId;
+  /** The matching value of the database `ProviderType` enum. */
   readonly type: ProviderType;
+
   /** False when credentials are missing, so the gateway can report the provider as unavailable. */
   isConfigured(): boolean;
+
+  /** Sends the conversation and returns the reply in the neutral shape. Throws ProviderError on failure. */
   chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult>;
+
+  /** Static facts about a model (context window, output limit), or undefined for models it does not know. */
+  getModelInfo(model: string): ModelInfo | undefined;
+
+  /**
+   * Token counts for a finished call: what the provider reported when it reported anything (each provider
+   * knows how its own usage fields map, for example Gemini counts "thinking" tokens as output), otherwise
+   * an estimate.
+   */
+  calculateUsage(request: ChatCompletionRequest, result: ChatCompletionResult): TokenUsage;
 }
 
 /** Injection token for the list of registered providers. Adding a provider means adding one entry. */

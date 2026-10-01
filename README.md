@@ -2,13 +2,13 @@
 
 **Multi-tenant LLM gateway and AI governance platform.**
 
-Tollbooth AI sits between your applications and AI providers (OpenAI, Anthropic, Gemini). It
-controls who can use which model, tracks tokens and cost, enforces budgets, falls back between
-providers when one fails, and screens prompts for sensitive data.
+Tollbooth AI sits between your applications and AI providers. Gemini is the active provider; OpenAI and
+Anthropic are implemented and ready to switch on. It controls who can use which model, tracks tokens and
+cost, enforces budgets and rate limits, and stops sending traffic to a provider that is failing.
 
-> **Status: Phase 5 complete.** Foundation, database, the control plane (authentication, RBAC, tenant
-> isolation), the dashboard the OpenAI-compatible gateway and its Redis traffic controls (rate limits, token quotas, budget
-> counters, circuit breaker) are in place. The dashboard shows
+> **Status: the gateway is provider-agnostic, with Gemini active.** Foundation, database, the control plane
+> (authentication, RBAC, tenant isolation), the dashboard, the OpenAI-compatible gateway and its Redis traffic
+> controls (rate limits, token quotas, budget counters, circuit breaker) are in place. The dashboard shows
 > sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
@@ -19,9 +19,12 @@ Client Applications
         v
  Tollbooth AI Gateway
         |
-  -------------------
-  |        |        |
-OpenAI  Anthropic  Gemini
+        v
+ AI Provider Router
+        |
+  ---------------------------------
+  |                |              |
+Gemini (active)  OpenAI (ready)  Anthropic (ready)
 ```
 
 The gateway (data plane) is kept separate from the control plane (management), and usage events are
@@ -93,7 +96,8 @@ development. After `pnpm db:seed` you can sign in as `admin@techcorp.com` with `
 All Node services read the same `PORT` variable. When running several at once, override it per
 process, for example `PORT=3001 pnpm --filter @tollbooth/control-plane dev`.
 
-The gateway serves `POST /v1/chat/completions`. Set `OPENAI_API_KEY` in `.env`, then
+The gateway serves `POST /v1/chat/completions` in the OpenAI format and routes to Gemini. Set `GOOGLE_AI_API_KEY`
+in `.env`, then
 `pnpm gateway:test` sends a request through it; see [docs/api/gateway-api.md](docs/api/gateway-api.md).
 
 To run the AI service, see [apps/ai-service/README.md](apps/ai-service/README.md).
@@ -105,7 +109,7 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test
 
 # Integration tests against the real Postgres from docker compose
 pnpm --filter @tollbooth/control-plane test:e2e
-pnpm --filter @tollbooth/gateway test:e2e     # uses a local fake OpenAI, no API key needed
+pnpm --filter @tollbooth/gateway test:e2e     # uses local fakes of Gemini, OpenAI and Anthropic, no API key needed
 ```
 
 ## Docker setup
@@ -146,6 +150,7 @@ reuse them outside local development.
 5. **Phase 4**: LLM gateway core (done): [docs/api/gateway-api.md](docs/api/gateway-api.md)
 6. **Phase 5**: Redis layer: rate limits, token quotas, budget counters, circuit breaker (done):
    [docs/architecture/redis-layer.md](docs/architecture/redis-layer.md)
+   and provider-agnostic routing with Gemini active: [docs/architecture/provider-architecture.md](docs/architecture/provider-architecture.md)
 7. **Next**: projects and API key management endpoints in the control plane
 8. Cost, usage tracking and billing, including rebuilding budget counters from the database
 9. Kafka event pipeline and workers

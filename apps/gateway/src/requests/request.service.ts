@@ -1,13 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ProviderType } from '@tollbooth/database';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
+import type { TokenUsage } from '../providers/provider.interface';
 import { RequestRepository } from './request.repository';
 
-export interface TokenUsage {
-  requestTokens: number;
-  responseTokens: number;
-  totalTokens: number;
-}
+export type { TokenUsage };
 
 interface RecordInput {
   auth: ApiKeyAuth;
@@ -29,8 +26,14 @@ export class RequestService {
 
   constructor(private readonly repository: RequestRepository) {}
 
-  recordSuccess(input: RecordInput & { usage: TokenUsage }): Promise<void> {
-    return this.save(input, { ...input.usage, status: 'SUCCESS' });
+  recordSuccess(
+    input: RecordInput & { usage: TokenUsage; estimatedCostUsd: string },
+  ): Promise<void> {
+    return this.save(input, {
+      ...input.usage,
+      status: 'SUCCESS',
+      estimatedCostUsd: input.estimatedCostUsd,
+    });
   }
 
   recordFailure(
@@ -47,7 +50,11 @@ export class RequestService {
 
   private async save(
     input: RecordInput,
-    outcome: TokenUsage & { status: 'SUCCESS' | 'FAILED'; errorMessage?: string },
+    outcome: TokenUsage & {
+      status: 'SUCCESS' | 'FAILED';
+      errorMessage?: string;
+      estimatedCostUsd?: string;
+    },
   ): Promise<void> {
     try {
       await this.repository.create({

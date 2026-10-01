@@ -36,7 +36,7 @@ forwards the request, and records what it cost.
   |              ^
   +--> usage events --> Kafka --> Worker
   |
-  +--> OpenAI | Anthropic | Gemini
+  +--> AI provider router --> Gemini (active) | OpenAI | Anthropic (ready)
 ```
 
 ## Request path (hot path)
@@ -46,7 +46,7 @@ Client --> Gateway
              1. authenticate API key            (Redis cache, Postgres fallback)
              2. check rate limit and budget     (Redis atomic counters)
              3. scan prompt                     (AI Service: PII / policy)
-             4. route to a provider, with fallback (OpenAI -> Anthropic -> Gemini)
+             4. route to a provider (Gemini is active; OpenAI and Anthropic are ready)
              5. stream the response to the client
              6. publish a usage event           (Kafka, async, off the hot path)
 ```
@@ -58,7 +58,7 @@ slows an LLM response.
 
 ### Client applications
 
-Customer software that would normally call OpenAI directly. It calls the Gateway with a Tollbooth
+Customer software that would normally call an AI provider directly (often through an OpenAI client library). It calls the Gateway with a Tollbooth
 API key. Changing the base URL and key should be the only integration work.
 
 ### Gateway API (`apps/gateway`)

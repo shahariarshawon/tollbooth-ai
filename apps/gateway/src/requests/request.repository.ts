@@ -12,6 +12,8 @@ export interface NewAiRequest {
   responseTokens: number;
   totalTokens: number;
   latencyMs: number;
+  /** USD, as a decimal string so no precision is lost on the way to the database. */
+  estimatedCostUsd?: string;
   status: AiRequestStatus;
   errorMessage?: string;
 }
@@ -33,9 +35,9 @@ export class RequestRepository {
         responseTokens: request.responseTokens,
         totalTokens: request.totalTokens,
         latencyMs: request.latencyMs,
+        estimatedCost: request.estimatedCostUsd ?? '0',
         status: request.status,
         errorMessage: request.errorMessage ?? null,
-        // estimatedCost keeps its default of 0; the billing phase fills it in.
       },
     });
   }

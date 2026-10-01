@@ -7,10 +7,14 @@ import type { AppConfig } from '../config/config.module';
 import type { ChatCompletionRequestDto } from '../dto/chat-completion.dto';
 import type { ChatCompletionResponse } from '../dto/chat-completion.response';
 import { ProviderError } from '../providers/provider.interface';
-import type { ChatCompletionRequest, ChatCompletionResult } from '../providers/provider.interface';
-import { ProviderService } from '../providers/provider.service';
+import type {
+  ChatCompletionRequest,
+  ChatCompletionResult,
+  ModelInfo,
+} from '../providers/provider.interface';
+import { ProviderRouter } from '../providers/provider.router';
 import { RequestService } from '../requests/request.service';
-import type { TokenUsage } from '../requests/request.service';
+import type { TokenUsage } from '../providers/provider.interface';
 import { TokenCounter } from '../tokens/token-counter.service';
 import { TrafficControlService } from '../traffic/traffic-control.service';
 
@@ -20,18 +24,19 @@ export interface PipelineContext {
 }
 
 /**
- * The request pipeline after authentication: validate the model and limits, select the provider,
- * call it, record the outcome, and answer in the OpenAI format.
+ * The request pipeline after authentication: validate the model and limits, route to a provider, call
+ * it, record the outcome, and answer in the OpenAI format. It never names a provider: everything it
+ * needs (the call, the model limits, the token accounting) comes through the AIProvider interface.
  *
- *   key guard (identity, permission) -> DTO validation -> limits -> model + provider selection
- *   -> provider call -> request record -> response
+ *   key guard (identity, permission) -> DTO validation -> limits -> provider router
+ *   -> provider call -> usage and cost -> request record -> response
  */
 @Injectable()
 export class GatewayService {
   private readonly logger = new Logger(GatewayService.name);
 
   constructor(
-    private readonly providers: ProviderService,
+    private readonly router: ProviderRouter,
     private readonly requests: RequestService,
     private readonly tokens: TokenCounter,
     private readonly traffic: TrafficControlService,
@@ -59,16 +64,19 @@ export class GatewayService {
       );
     }
 
-    const model = await this.providers.resolve(dto.model);
+    const model = await this.router.resolve(dto.model);
     const request = this.toProviderRequest(dto);
-    // Kept in case the call fails: a failed request still tells us how much the caller sent.
+    // Kept in case the call fails: a failed request still tells us how much the caller sent. This is
+    // an estimate (an OpenAI vocabulary is only exact for OpenAI models); the provider's own figure
+    // replaces it once the call succeeds.
     const estimatedInputTokens = this.tokens.countMessages(dto.model, request.messages);
+    this.checkModelLimits(model.info, dto, estimatedInputTokens);
 
     // Token quota, budget and circuit breaker. Throws 429, 402 or 503 before any provider work.
     const admission = await this.traffic.admit({
       requestId: context.requestId,
       auth: context.auth,
-      providerType: model.providerType,
+      providerId: model.providerId,
       prices: model.prices,
       inputTokens: estimatedInputTokens,
       maxTokens: dto.max_tokens,
@@ -102,8 +110,8 @@ export class GatewayService {
     }
 
     const latencyMs = performance.now() - startedAt;
-    const usage = this.usageOf(result, dto.model, estimatedInputTokens);
-    await this.traffic.complete(admission, {
+    const usage = model.provider.calculateUsage(request, result);
+    const costMicroUsd = await this.traffic.complete(admission, {
       inputTokens: usage.requestTokens,
       outputTokens: usage.responseTokens,
     });
@@ -113,6 +121,8 @@ export class GatewayService {
       model: model.name,
       latencyMs,
       usage,
+      // Micro-dollars to dollars, as a decimal string: exact, and 0 on a free tier.
+      estimatedCostUsd: (costMicroUsd / 1_000_000).toFixed(8),
     });
 
     return this.toResponse(result, usage);
@@ -136,16 +146,27 @@ export class GatewayService {
     };
   }
 
-  /** Provider-reported usage is authoritative; our own count is only the fallback. */
-  private usageOf(result: ChatCompletionResult, model: string, estimatedInput: number): TokenUsage {
-    const requestTokens = result.usage?.promptTokens ?? estimatedInput;
-    const responseTokens =
-      result.usage?.completionTokens ??
-      result.choices.reduce(
-        (sum, choice) => sum + this.tokens.countText(model, choice.message.content ?? ''),
-        0,
+  /** Refuses what the model is known to be unable to handle, without a round trip to the provider. */
+  private checkModelLimits(
+    info: ModelInfo | undefined,
+    dto: ChatCompletionRequestDto,
+    estimatedInputTokens: number,
+  ): void {
+    if (!info) return;
+    if (dto.max_tokens !== undefined && dto.max_tokens > info.maxOutputTokens) {
+      throw GatewayErrors.invalidRequest(
+        `max_tokens must be at most ${info.maxOutputTokens} for ${info.name}.`,
+        'max_tokens',
+        'max_tokens_exceeded',
       );
-    return { requestTokens, responseTokens, totalTokens: requestTokens + responseTokens };
+    }
+    if (estimatedInputTokens > info.contextWindow) {
+      throw GatewayErrors.invalidRequest(
+        `The conversation is about ${estimatedInputTokens} tokens, more than the ${info.contextWindow} that ${info.name} accepts.`,
+        'messages',
+        'context_length_exceeded',
+      );
+    }
   }
 
   private toResponse(result: ChatCompletionResult, usage: TokenUsage): ChatCompletionResponse {

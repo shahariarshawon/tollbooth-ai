@@ -3,15 +3,29 @@ import type { ProviderType } from '@tollbooth/database';
 import OpenAI from 'openai';
 import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
+import { TokenCounter } from '../tokens/token-counter.service';
+import { lookupModelInfo } from './model-info';
+import { usageFromResult } from './provider-support';
 import { ProviderError } from './provider.interface';
-import type { AIProvider, ChatCompletionRequest, ChatCompletionResult } from './provider.interface';
+import type {
+  AIProvider,
+  ChatCompletionRequest,
+  ChatCompletionResult,
+  ModelInfo,
+  ProviderId,
+  TokenUsage,
+} from './provider.interface';
 
 @Injectable()
 export class OpenAIProvider implements AIProvider {
+  readonly id: ProviderId = 'openai';
   readonly type: ProviderType = 'OPENAI';
   private readonly client: OpenAI | null;
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+  constructor(
+    @Inject(APP_CONFIG) config: AppConfig,
+    private readonly tokens: TokenCounter,
+  ) {
     this.client = config.OPENAI_API_KEY
       ? new OpenAI({
           apiKey: config.OPENAI_API_KEY,
@@ -25,6 +39,14 @@ export class OpenAIProvider implements AIProvider {
 
   isConfigured(): boolean {
     return this.client !== null;
+  }
+
+  getModelInfo(model: string): ModelInfo | undefined {
+    return lookupModelInfo(this.id, model);
+  }
+
+  calculateUsage(request: ChatCompletionRequest, result: ChatCompletionResult): TokenUsage {
+    return usageFromResult(this.tokens, request, result);
   }
 
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult> {

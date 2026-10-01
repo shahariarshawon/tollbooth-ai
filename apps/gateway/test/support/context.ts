@@ -10,20 +10,34 @@ import { AppModule } from '../../src/app.module';
 import { CIRCUIT_OPTIONS } from '../../src/circuit-breaker/circuit-breaker.service';
 import type { CircuitBreakerOptions } from '../../src/circuit-breaker/circuit-breaker.service';
 import { configureApp } from '../../src/configure-app';
+import { RedisService } from '../../src/redis/redis.service';
 import { DEFAULT_PLAN_LIMITS, PLAN_LIMITS } from '../../src/traffic/plan-limits';
 import type { PlanLimits } from '../../src/traffic/plan-limits';
-import { RedisService } from '../../src/redis/redis.service';
+import { FAKE_ANTHROPIC_API_KEY, startFakeAnthropic } from './fake-anthropic';
+import { FAKE_GEMINI_API_KEY, startFakeGemini } from './fake-gemini';
 import { startFakeOpenAi } from './fake-openai';
 import type { FakeOpenAi } from './fake-openai';
+import type { FakeProvider } from './fake-server';
+
+/** The three providers, each backed by a local fake that speaks its real wire format. */
+export interface Fakes {
+  gemini: FakeProvider;
+  openai: FakeOpenAi;
+  anthropic: FakeProvider;
+}
 
 export interface TestContext {
   app: INestApplication;
   prisma: PrismaService;
-  fake: FakeOpenAi;
+  /** The fake Gemini, the active provider. Most tests only need this one. */
+  fake: FakeProvider;
+  fakes: Fakes;
   redis: RedisService;
   tenantIds: string[];
   modelIds: string[];
   providerIds: string[];
+  /** Provider rows as they were before the suite changed them, put back at the end. */
+  providerSnapshots: { id: string; status: 'ACTIVE' | 'DISABLED'; configuration: object }[];
 }
 
 export interface Fixture {
@@ -41,13 +55,31 @@ export interface ContextOptions {
   circuit?: Partial<CircuitBreakerOptions>;
 }
 
-/** Boots the real gateway against the real database and Redis, with OpenAI replaced by a local fake. */
+/**
+ * Boots the real gateway against the real database and Redis, with the three AI providers replaced by
+ * local fakes. Gemini is active, as in production; OpenAI and Anthropic are switched off in the database
+ * until a test turns them on with setProvider().
+ */
 export async function createTestContext(options: ContextOptions = {}): Promise<TestContext> {
-  const fake = await startFakeOpenAi();
-  // Read by the config module when the application is created below.
-  process.env['OPENAI_BASE_URL'] = fake.url;
+  const fakes: Fakes = {
+    gemini: await startFakeGemini(),
+    openai: await startFakeOpenAi(),
+    anthropic: await startFakeAnthropic(),
+  };
+  const closeFakes = () => Promise.all(Object.values(fakes).map((fake) => fake.close()));
+
   const saved = { ...process.env };
-  Object.assign(process.env, options.env ?? {});
+  // Read by the config module while the application is built below, then put back. Fake keys always
+  // win over whatever real keys the developer has in .env.
+  Object.assign(process.env, {
+    GOOGLE_AI_API_KEY: FAKE_GEMINI_API_KEY,
+    GOOGLE_AI_BASE_URL: fakes.gemini.url,
+    OPENAI_API_KEY: 'sk-test-e2e-not-a-real-key',
+    OPENAI_BASE_URL: fakes.openai.url,
+    ANTHROPIC_API_KEY: FAKE_ANTHROPIC_API_KEY,
+    ANTHROPIC_BASE_URL: fakes.anthropic.url,
+    ...(options.env ?? {}),
+  });
 
   const builder = Test.createTestingModule({ imports: [AppModule] });
   if (options.planLimits) {
@@ -71,6 +103,7 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
       }),
     });
   }
+
   let app: NestExpressApplication;
   try {
     const moduleRef = await builder.compile();
@@ -78,23 +111,23 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
     configureApp(app);
     await app.init();
   } catch (error) {
-    // Do not leave the fake server listening: it would keep the test process alive forever.
-    await fake.close();
+    // Do not leave the fake servers listening: they would keep the test process alive forever.
+    await closeFakes();
     throw error;
   } finally {
-    // The environment only matters while the modules above are being built.
     process.env = saved;
   }
 
-  const prisma = app.get(PrismaService);
   const context: TestContext = {
     app,
-    prisma,
-    fake,
+    prisma: app.get(PrismaService),
+    fake: fakes.gemini,
+    fakes,
     redis: app.get(RedisService),
     tenantIds: [],
     modelIds: [],
     providerIds: [],
+    providerSnapshots: [],
   };
   await ensureCatalogue(context);
   return context;
@@ -106,23 +139,73 @@ export function http(context: TestContext) {
 
 const unique = (prefix: string): string => `${prefix}-${randomUUID().slice(0, 8)}`;
 
-/** The models the tests rely on. Upserts, so they coexist with the development seed. */
+type ProviderName = 'Google Gemini' | 'OpenAI' | 'Anthropic';
+
+/**
+ * Turns a provider on or off, and sets whether its account is billed, in the database. The router reads
+ * the row on every request, so the change applies at once. Whatever the row was before the suite started
+ * is restored by destroyTestContext.
+ */
+export async function setProvider(
+  context: TestContext,
+  name: ProviderName,
+  settings: { status?: 'ACTIVE' | 'DISABLED'; tier?: 'free' | 'paid' },
+): Promise<void> {
+  await context.prisma.aiProvider.update({
+    where: { name },
+    data: {
+      ...(settings.status && { status: settings.status }),
+      ...(settings.tier && { configuration: { tier: settings.tier } }),
+    },
+  });
+}
+
+/**
+ * The providers and models the tests rely on. Upserts, so they coexist with the development seed, and
+ * the state the suite starts from matches production: Gemini active (on a paid tier here, so that cost
+ * and budget move), OpenAI and Anthropic present but disabled.
+ */
 async function ensureCatalogue(context: TestContext): Promise<void> {
   const { prisma } = context;
-  const openai = await prisma.aiProvider.upsert({
-    where: { name: 'OpenAI' },
-    update: {},
-    create: { name: 'OpenAI', type: 'OPENAI' },
-  });
-  const anthropic = await prisma.aiProvider.upsert({
-    where: { name: 'Anthropic' },
-    update: {},
-    create: { name: 'Anthropic', type: 'ANTHROPIC' },
-  });
+  const definitions = [
+    { name: 'Google Gemini', type: 'GOOGLE', status: 'ACTIVE', tier: 'paid' },
+    { name: 'OpenAI', type: 'OPENAI', status: 'DISABLED', tier: 'paid' },
+    { name: 'Anthropic', type: 'ANTHROPIC', status: 'DISABLED', tier: 'paid' },
+  ] as const;
+
+  const ids = new Map<string, string>();
+  for (const definition of definitions) {
+    const before = await prisma.aiProvider.findUnique({ where: { name: definition.name } });
+    if (before) {
+      context.providerSnapshots.push({
+        id: before.id,
+        status: before.status,
+        configuration: (before.configuration ?? {}) as object,
+      });
+    }
+    const provider = await prisma.aiProvider.upsert({
+      where: { name: definition.name },
+      update: { status: definition.status, configuration: { tier: definition.tier } },
+      create: {
+        name: definition.name,
+        type: definition.type,
+        status: definition.status,
+        configuration: { tier: definition.tier },
+      },
+    });
+    ids.set(definition.name, provider.id);
+  }
+  const gemini = ids.get('Google Gemini')!;
+  const openai = ids.get('OpenAI')!;
+  const anthropic = ids.get('Anthropic')!;
+
   for (const [providerId, modelName] of [
-    [openai.id, 'gpt-4'],
-    [openai.id, 'gpt-4o-mini'],
-    [anthropic.id, 'claude-sonnet-4-5'],
+    [gemini, 'gemini-2.0-flash'],
+    [gemini, 'gemini-2.0-flash-lite'],
+    [gemini, 'gemini-2.5-flash'],
+    [openai, 'gpt-4'],
+    [openai, 'gpt-4o-mini'],
+    [anthropic, 'claude-sonnet-4-5'],
   ] as const) {
     await prisma.aiModel.upsert({
       where: { providerId_modelName: { providerId, modelName } },
@@ -130,13 +213,14 @@ async function ensureCatalogue(context: TestContext): Promise<void> {
       create: { providerId, modelName, inputTokenPrice: '1.00', outputTokenPrice: '2.00' },
     });
   }
-  // These two exist only for the duration of the suite.
-  // An upsert, so a run that was interrupted before cleanup cannot break the next one.
+
+  // These exist only for the duration of the suite. An upsert, so a run that was interrupted before
+  // cleanup cannot break the next one.
   const inactive = await prisma.aiModel.upsert({
-    where: { providerId_modelName: { providerId: openai.id, modelName: 'e2e-inactive-model' } },
+    where: { providerId_modelName: { providerId: gemini, modelName: 'e2e-inactive-model' } },
     update: { isActive: false },
     create: {
-      providerId: openai.id,
+      providerId: gemini,
       modelName: 'e2e-inactive-model',
       inputTokenPrice: '1.00',
       outputTokenPrice: '2.00',
@@ -144,7 +228,7 @@ async function ensureCatalogue(context: TestContext): Promise<void> {
     },
   });
   const disabledProvider = await prisma.aiProvider.create({
-    data: { name: unique('E2E Disabled Provider'), type: 'OPENAI', status: 'DISABLED' },
+    data: { name: unique('E2E Disabled Provider'), type: 'GOOGLE', status: 'DISABLED' },
   });
   const onDisabled = await prisma.aiModel.create({
     data: {
@@ -203,7 +287,7 @@ export async function createKey(
 }
 
 /**
- * Forgets every counter of the tenants created so far, plus the provider circuit, so a test starts from
+ * Forgets every counter of the tenants created so far, plus the provider circuits, so a test starts from
  * a clean slate. Other suites and other tenants are untouched.
  */
 export async function resetTrafficState(context: TestContext): Promise<void> {
@@ -227,8 +311,11 @@ export async function tenantCounter(
   return key ? Number(await context.redis.client.get(key)) : 0;
 }
 
+/** The default model of the tests: Gemini, the active provider. */
+export const DEFAULT_MODEL = 'gemini-2.0-flash';
+
 export const chat = (content = 'Hello', extra: Record<string, unknown> = {}) => ({
-  model: 'gpt-4',
+  model: DEFAULT_MODEL,
   messages: [{ role: 'user', content }],
   ...extra,
 });
@@ -243,6 +330,12 @@ export async function destroyTestContext(context: TestContext): Promise<void> {
   await prisma.tenant.deleteMany({ where: { id: { in: context.tenantIds } } });
   await prisma.aiModel.deleteMany({ where: { id: { in: context.modelIds } } });
   await prisma.aiProvider.deleteMany({ where: { id: { in: context.providerIds } } });
+  for (const snapshot of context.providerSnapshots) {
+    await prisma.aiProvider.update({
+      where: { id: snapshot.id },
+      data: { status: snapshot.status, configuration: snapshot.configuration },
+    });
+  }
   await context.app.close();
-  await context.fake.close();
+  await Promise.all(Object.values(context.fakes).map((fake) => fake.close()));
 }

@@ -21,7 +21,7 @@ rebuilding from the database; nothing permanent is lost.
                          |     1. token quota    reserve estimated tokens          (Redis)  429
                          |     2. budget         reserve worst-case cost           (Redis)  402
                          |     3. circuit        is the provider healthy?          (Redis)  503
-                         |  provider call        OpenAI                                      |
+                         |  provider call        Gemini (via the provider router)            |
                          |  TrafficControlService.complete / abort                           |
                          |     settle tokens and budget to real usage, update circuit (Redis)
                          |  save ai_requests row                                   (Postgres)
@@ -193,7 +193,9 @@ entry or an invoice line; those belong to the billing phase.
 
 ## 5. Circuit breaker lifecycle
 
-One JSON value per provider, `provider:openai:circuit`, shared by every gateway instance:
+One JSON value per provider (`provider:gemini:circuit`, `provider:openai:circuit`, `provider:anthropic:circuit`),
+shared by every gateway instance. Each provider has its own breaker, so one provider failing never stops traffic to
+another:
 
 ```json
 {

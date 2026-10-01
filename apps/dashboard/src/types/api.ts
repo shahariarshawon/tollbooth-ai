@@ -91,7 +91,15 @@ export interface NamedCount {
   value: number;
 }
 
+/** A provider the gateway can route to. Active ones serve traffic; available ones are ready but switched off. */
+export interface ProviderOverview {
+  id: 'gemini' | 'openai' | 'anthropic';
+  name: string;
+  status: 'ACTIVE' | 'AVAILABLE';
+}
+
 export interface DashboardOverview {
+  providers: ProviderOverview[];
   stats: {
     totalRequests: number;
     totalTokens: number;

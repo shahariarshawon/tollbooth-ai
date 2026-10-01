@@ -43,4 +43,34 @@ describe('cost estimation for budget reservations', () => {
     const actual = costMicroUsd(prices, 100, 400);
     expect(worstCaseMicroUsd(prices, 100, 500)).toBeGreaterThanOrEqual(actual);
   });
+
+  describe('pricing tiers', () => {
+    it('costs nothing on a free tier, however many tokens', () => {
+      const free = { ...prices, tier: 'free' as const };
+      expect(costMicroUsd(free, 1_000_000, 1_000_000)).toBe(0);
+      expect(worstCaseMicroUsd(free, 5_000, 4_096)).toBe(0);
+    });
+
+    it('treats a paid tier, and no tier at all, as billed', () => {
+      expect(costMicroUsd({ ...prices, tier: 'paid' }, 11, 7)).toBe(11 * 30 + 7 * 60);
+      expect(costMicroUsd(prices, 11, 7)).toBe(11 * 30 + 7 * 60);
+    });
+
+    it('keeps the prices on record while free, so moving to a paid plan needs only the tier changed', () => {
+      const account = { input: '0.10', output: '0.40' };
+      expect(costMicroUsd({ ...account, tier: 'free' }, 1000, 1000)).toBe(0);
+      expect(costMicroUsd({ ...account, tier: 'paid' }, 1000, 1000)).toBe(100 + 400);
+    });
+  });
+
+  describe('provider independence', () => {
+    it('prices any provider the same way, from the prices it is given', () => {
+      const gemini = { input: '0.10', output: '0.40' };
+      const openai = { input: '2.50', output: '10.00' };
+      const anthropic = { input: '3.00', output: '15.00' };
+      expect(costMicroUsd(gemini, 1000, 500)).toBe(100 + 200);
+      expect(costMicroUsd(openai, 1000, 500)).toBe(2500 + 5000);
+      expect(costMicroUsd(anthropic, 1000, 500)).toBe(3000 + 7500);
+    });
+  });
 });

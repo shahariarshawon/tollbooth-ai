@@ -72,7 +72,7 @@ describe('Traffic control (e2e)', () => {
     return Object.fromEntries(Object.entries(hash).map(([k, v]) => [k, Number(v)]));
   };
   const circuit = async () => {
-    const raw = await ctx.redis.client.get(RedisKeys.circuit('openai'));
+    const raw = await ctx.redis.client.get(RedisKeys.circuit('gemini'));
     return raw ? (JSON.parse(raw) as { state: string; failureCount: number }) : null;
   };
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -218,7 +218,7 @@ describe('Traffic control (e2e)', () => {
   describe('budget', () => {
     const modelPrices = () =>
       ctx.prisma.aiModel.findFirstOrThrow({
-        where: { modelName: 'gpt-4', provider: { type: 'OPENAI' } },
+        where: { modelName: 'gemini-2.0-flash', provider: { type: 'GOOGLE' } },
       });
 
     it('settles the real cost after a call and holds nothing back', async () => {
@@ -337,7 +337,7 @@ describe('Traffic control (e2e)', () => {
       expect(event('circuit_state_changed')).toMatchObject({
         from: 'CLOSED',
         to: 'OPEN',
-        provider: 'openai',
+        provider: 'gemini',
       });
       expect(event('circuit_open_rejected')).toMatchObject({
         tenantId: roomy.tenantId,

@@ -42,6 +42,20 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   ANTHROPIC_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   GOOGLE_AI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+  /** Which provider serves a model when several active ones offer it. Gemini is the primary provider. */
+  GATEWAY_DEFAULT_PROVIDER: z.preprocess(
+    blankToUndefined,
+    z.enum(['gemini', 'openai', 'anthropic']).default('gemini'),
+  ),
+  /** Google AI Studio (Gemini API) endpoint, including the API version. */
+  GOOGLE_AI_BASE_URL: z.preprocess(
+    blankToUndefined,
+    z.string().url().default('https://generativelanguage.googleapis.com/v1beta'),
+  ),
+  ANTHROPIC_BASE_URL: z.preprocess(
+    blankToUndefined,
+    z.string().url().default('https://api.anthropic.com'),
+  ),
   OPENAI_BASE_URL: z.preprocess(
     blankToUndefined,
     z.string().url().default('https://api.openai.com/v1'),

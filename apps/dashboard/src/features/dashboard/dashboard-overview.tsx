@@ -8,6 +8,7 @@ import { CardGridSkeleton, Skeleton } from '@/components/ui/states';
 import { dashboardService } from '@/services/dashboard.service';
 import { CostTrendChart, ModelUsageChart, ProviderUsageChart, RequestVolumeChart } from './charts';
 import { DashboardStats } from './dashboard-stats';
+import { ProviderStatus } from './provider-status';
 
 function OverviewSkeleton() {
   return (
@@ -39,6 +40,7 @@ export function DashboardOverview() {
         {(data) => (
           <div className="flex flex-col gap-6">
             <DashboardStats stats={data.stats} />
+            <ProviderStatus providers={data.providers} />
             <div className="grid gap-4 lg:grid-cols-2">
               <RequestVolumeChart data={data.requestVolume} />
               <CostTrendChart data={data.costTrend} />

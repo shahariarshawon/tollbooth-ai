@@ -248,6 +248,6 @@ history is the only place extensions are created, so no init script runs in the 
 
 Tenant `techcorp-ai` (TechCorp AI, Startup plan), users `admin@techcorp.com` (tenant admin) and
 `developer@techcorp.com`, both with the development password `ChangeMe123!`, project
-`Customer Support AI`, providers OpenAI, Anthropic and Google, models `gpt-4o` and
+`Customer Support AI`, providers Google Gemini (ACTIVE, free tier), OpenAI and Anthropic (both DISABLED), Gemini models plus `gpt-4o` and
 `claude-sonnet-4-5`, and one generated API key. The raw key is printed once when first seeded and
 only its hash is stored. Seed passwords use `scrypt`; the authentication phase may rehash at first login.

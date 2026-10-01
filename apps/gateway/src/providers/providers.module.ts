@@ -1,19 +1,30 @@
 import { Module } from '@nestjs/common';
+import { TokensModule } from '../tokens/tokens.module';
+import { AnthropicProvider } from './anthropic.provider';
+import { GeminiProvider } from './gemini.provider';
 import { OpenAIProvider } from './openai.provider';
 import { AI_PROVIDERS } from './provider.interface';
-import { ProviderService } from './provider.service';
+import { ProviderRouter } from './provider.router';
 
 @Module({
+  imports: [TokensModule],
   providers: [
+    GeminiProvider,
     OpenAIProvider,
-    // Register new providers here; ProviderService picks them up by `type`.
+    AnthropicProvider,
+    // Register new providers here; the router picks them up by `type`. Whether one actually serves
+    // traffic is decided by its row in ai_providers and by whether its API key is set.
     {
       provide: AI_PROVIDERS,
-      useFactory: (openai: OpenAIProvider) => [openai],
-      inject: [OpenAIProvider],
+      useFactory: (
+        gemini: GeminiProvider,
+        openai: OpenAIProvider,
+        anthropic: AnthropicProvider,
+      ) => [gemini, openai, anthropic],
+      inject: [GeminiProvider, OpenAIProvider, AnthropicProvider],
     },
-    ProviderService,
+    ProviderRouter,
   ],
-  exports: [ProviderService],
+  exports: [ProviderRouter],
 })
 export class ProvidersModule {}

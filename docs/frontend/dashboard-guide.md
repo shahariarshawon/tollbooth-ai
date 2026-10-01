@@ -76,16 +76,16 @@ Components use only those tokens, so restyling is a change to that one block.
 
 ## Routing
 
-| Route                                                       | Who sees it (permission)                            | Data                     |
-| ----------------------------------------------------------- | --------------------------------------------------- | ------------------------ |
-| `/login`                                                    | everyone                                            | control plane            |
-| `/dashboard`                                                | everyone                                            | sample data              |
-| `/dashboard/tenants`                                        | `TENANT_MANAGE` (super admin)                       | control plane            |
-| `/dashboard/users`                                          | `USER_READ`                                         | control plane            |
-| `/dashboard/projects`                                       | `PROJECT_READ`                                      | mock until backend ships |
-| `/dashboard/api-keys`                                       | `API_KEY_CREATE`                                    | mock until backend ships |
-| `/dashboard/profile`                                        | everyone                                            | control plane            |
-| `/dashboard/analytics`, `billing`, `audit-logs`, `settings` | `VIEW_ANALYTICS`, `VIEW_BILLING`, `MANAGE_SETTINGS` | placeholder              |
+| Route                                                       | Who sees it (permission)                            | Data                                      |
+| ----------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| `/login`                                                    | everyone                                            | control plane                             |
+| `/dashboard`                                                | everyone                                            | sample data, including AI provider status |
+| `/dashboard/tenants`                                        | `TENANT_MANAGE` (super admin)                       | control plane                             |
+| `/dashboard/users`                                          | `USER_READ`                                         | control plane                             |
+| `/dashboard/projects`                                       | `PROJECT_READ`                                      | mock until backend ships                  |
+| `/dashboard/api-keys`                                       | `API_KEY_CREATE`                                    | mock until backend ships                  |
+| `/dashboard/profile`                                        | everyone                                            | control plane                             |
+| `/dashboard/analytics`, `billing`, `audit-logs`, `settings` | `VIEW_ANALYTICS`, `VIEW_BILLING`, `MANAGE_SETTINGS` | placeholder                               |
 
 Access is enforced in three layers:
 

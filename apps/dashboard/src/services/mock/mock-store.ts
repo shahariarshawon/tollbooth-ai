@@ -98,6 +98,12 @@ export function buildOverview(): DashboardOverview {
   }));
 
   return {
+    // Mirrors the gateway: Gemini serves traffic, the others are implemented but switched off.
+    providers: [
+      { id: 'gemini', name: 'Google Gemini', status: 'ACTIVE' },
+      { id: 'openai', name: 'OpenAI', status: 'AVAILABLE' },
+      { id: 'anthropic', name: 'Anthropic', status: 'AVAILABLE' },
+    ],
     stats: {
       totalRequests: requestVolume.reduce((sum, day) => sum + day.requests, 0),
       totalTokens: 48_250_000,
@@ -107,15 +113,11 @@ export function buildOverview(): DashboardOverview {
     requestVolume,
     costTrend,
     modelUsage: [
-      { label: 'gpt-4o', value: 52_400 },
-      { label: 'claude-sonnet', value: 38_900 },
-      { label: 'gpt-4o-mini', value: 27_100 },
-      { label: 'gemini-pro', value: 11_800 },
+      { label: 'gemini-2.0-flash', value: 71_200 },
+      { label: 'gemini-2.0-flash-lite', value: 38_400 },
+      { label: 'gemini-2.5-flash', value: 24_900 },
+      { label: 'gemini-2.5-pro', value: 6_300 },
     ],
-    providerUsage: [
-      { label: 'OpenAI', value: 79_500 },
-      { label: 'Anthropic', value: 38_900 },
-      { label: 'Google', value: 11_800 },
-    ],
+    providerUsage: [{ label: 'Google Gemini', value: 140_800 }],
   };
 }

@@ -2,7 +2,7 @@
  * Sends a chat completion through a running gateway and shows what came back.
  *
  *   pnpm gateway:test
- *   pnpm gateway:test -- --model gpt-4o-mini --prompt "Say hi in five words"
+ *   pnpm gateway:test -- --model gemini-2.5-flash --prompt "Say hi in five words"
  *   TOLLBOOTH_API_KEY=tb_... pnpm gateway:test -- --url https://gateway.example.com
  *
  * Without TOLLBOOTH_API_KEY it issues a development key for the seeded TechCorp project (needs the
@@ -16,7 +16,7 @@ import { parseArgs } from 'node:util';
 const { values } = parseArgs({
   options: {
     url: { type: 'string', default: process.env['GATEWAY_URL'] ?? 'http://localhost:3000' },
-    model: { type: 'string', default: 'gpt-4o-mini' },
+    model: { type: 'string', default: 'gemini-2.0-flash' },
     prompt: { type: 'string', default: 'Reply with one short sentence about toll booths.' },
   },
   allowPositionals: false,
