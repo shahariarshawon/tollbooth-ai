@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
-import { Permission } from '@tollbooth/shared';
-import { ComingSoon } from '@/components/coming-soon';
+import { BillingPage } from '@/features/billing/billing-page';
 
-export const metadata: Metadata = { title: 'Billing' };
+export const metadata: Metadata = { title: 'Billing & Cost Control' };
 
 export default function Page() {
-  return (
-    <ComingSoon
-      title="Billing"
-      description="Spend, budgets and invoices."
-      permission={Permission.VIEW_BILLING}
-    />
-  );
+  return <BillingPage />;
 }

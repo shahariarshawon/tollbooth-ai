@@ -4,6 +4,8 @@ import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/features/auth/auth-provider';
 
+import { ToastProvider } from '@/components/ui/toast';
+
 export function Providers({ children }: { children: React.ReactNode }) {
   // One client per browser session, created in state so it is never shared between server requests.
   const [queryClient] = React.useState(
@@ -25,7 +27,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

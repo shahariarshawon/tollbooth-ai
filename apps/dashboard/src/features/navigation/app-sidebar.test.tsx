@@ -14,6 +14,7 @@ const ALL = [
   'Dashboard',
   'Tenant Management',
   'Users',
+  'Teams & Limits',
   'Projects',
   'API Keys',
   'Usage Analytics',
@@ -39,6 +40,7 @@ describe('AppSidebar permissions', () => {
       [
         'Dashboard',
         'Users',
+        'Teams & Limits',
         'Projects',
         'API Keys',
         'Usage Analytics',

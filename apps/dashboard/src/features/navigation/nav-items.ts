@@ -29,6 +29,12 @@ export const NAV_ITEMS: AppNavItem[] = [
   },
   { label: 'Users', href: '/dashboard/users', icon: Users, permission: Permission.USER_READ },
   {
+    label: 'Teams & Limits',
+    href: '/dashboard/teams',
+    icon: Users,
+    permission: Permission.TEAM_READ,
+  },
+  {
     label: 'Projects',
     href: '/dashboard/projects',
     icon: FolderKanban,
@@ -58,7 +64,7 @@ export const NAV_ITEMS: AppNavItem[] = [
     label: 'Audit Logs',
     href: '/dashboard/audit-logs',
     icon: ScrollText,
-    permission: Permission.MANAGE_SETTINGS,
+    permission: Permission.VIEW_AUDIT_LOGS,
   },
   {
     label: 'Settings',

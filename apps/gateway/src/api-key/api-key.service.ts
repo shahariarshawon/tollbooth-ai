@@ -34,13 +34,15 @@ export class ApiKeyService {
         id: true,
         tenantId: true,
         projectId: true,
+        teamId: true,
         permissions: true,
         rateLimit: true,
         status: true,
         expiresAt: true,
         lastUsedAt: true,
         tenant: { select: { status: true, plan: true } },
-        project: { select: { status: true } },
+        project: { select: { status: true, teamId: true, allowedModels: true } },
+        team: { select: { id: true, allowedModels: true, rateLimitRpm: true } },
       },
     });
 
@@ -61,13 +63,19 @@ export class ApiKeyService {
         );
     }
 
+    const teamAllowed = key.team?.allowedModels ?? [];
+    const projectAllowed = key.project?.allowedModels ?? [];
+    const effectiveAllowedModels = teamAllowed.length > 0 ? teamAllowed : projectAllowed;
+
     return {
       apiKeyId: key.id,
       tenantId: key.tenantId,
       projectId: key.projectId,
+      teamId: key.teamId ?? key.project?.teamId ?? null,
       plan: key.tenant.plan,
       permissions: key.permissions,
-      rateLimit: key.rateLimit,
+      rateLimit: key.rateLimit ?? key.team?.rateLimitRpm ?? null,
+      allowedModels: effectiveAllowedModels,
     };
   }
 }

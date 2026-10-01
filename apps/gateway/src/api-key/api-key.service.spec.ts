@@ -50,9 +50,11 @@ describe('ApiKeyService', () => {
       apiKeyId: 'k1',
       tenantId: 't1',
       projectId: 'p1',
+      teamId: null,
       plan: 'STARTUP',
       permissions: ['chat:completions'],
       rateLimit: 60,
+      allowedModels: [],
     });
   });
 

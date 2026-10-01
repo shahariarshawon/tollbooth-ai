@@ -58,6 +58,14 @@ export interface Project {
   name: string;
   description: string | null;
   status: ProjectStatus;
+  teamId?: string | null;
+  team?: { id: string; name: string } | null;
+  allowedModels?: string[];
+  monthlyBudget?: number | null;
+  apiKeysCount?: number;
+  requestsCount?: number;
+  totalTokens?: number;
+  totalCost?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +77,8 @@ export interface ApiKey {
   id: string;
   projectId: string;
   projectName: string;
+  teamId?: string | null;
+  teamName?: string | null;
   name: string;
   /** First characters of the key, safe to display. */
   keyPrefix: string;
@@ -76,8 +86,163 @@ export interface ApiKey {
   /** Requests per minute; null means the plan default. */
   rateLimit: number | null;
   status: ApiKeyStatus;
+  expiresAt?: string | null;
   createdAt: string;
   lastUsedAt: string | null;
+  requestsCount?: number;
+  totalTokens?: number;
+  totalCost?: number;
+}
+
+export type TeamMemberRole = 'LEAD' | 'MEMBER' | 'VIEWER';
+
+export interface TeamMember {
+  id: string;
+  userId: string;
+  role: TeamMemberRole;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+  };
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string | null;
+  rateLimitRpm: number | null;
+  rateLimitRpd: number | null;
+  tokenLimitTpm: number | null;
+  tokenLimitTpd: number | null;
+  dailyBudget: number | null;
+  monthlyBudget: number | null;
+  allowedModels: string[];
+  membersCount: number;
+  projectsCount: number;
+  apiKeysCount: number;
+  members: TeamMember[];
+  currentUsageCost: number;
+  currentTokens: number;
+  currentRequests: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderCostSummary {
+  provider: string;
+  requests: number;
+  tokens: number;
+  cost: number;
+  percentage: number;
+}
+
+export interface BillingSummary {
+  currentPlan: {
+    name: string;
+    code: string;
+    monthlyPrice: number;
+    description: string | null;
+    features: string[];
+    status: string;
+  };
+  monthlyLimit: number;
+  currentUsage: number;
+  remainingBudget: number;
+  estimatedCost: number;
+  totalTokens: number;
+  providerBreakdown: ProviderCostSummary[];
+}
+
+export interface BillingPlanItem {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  monthlyPrice: number;
+  monthlyBudgetLimit: number;
+  dailyBudgetLimit: number | null;
+  requestsPerMinute: number;
+  requestsPerDay: number;
+  tokensPerMinute: number;
+  tokensPerDay: number;
+  features: string[];
+  isActive: boolean;
+}
+
+export interface BillingHistoryItem {
+  id: string;
+  transactionType: string;
+  amount: number;
+  currency: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+  actor: {
+    id: string;
+    email: string;
+    name: string;
+  } | null;
+}
+
+export interface AuditLogsResponse {
+  logs: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface GeneralSettings {
+  orgName: string;
+  logoUrl: string;
+  timezone: string;
+  contactEmail: string;
+}
+
+export interface SecuritySettings {
+  sessionTimeoutMinutes: number;
+  passwordMinLength: number;
+  requireSpecialChar: boolean;
+  defaultKeyExpiryDays: number;
+}
+
+export interface AiSettings {
+  defaultProvider: string;
+  allowedModels: string[];
+  maxInputTokens: number;
+  maxOutputTokens: number;
+}
+
+export interface NotificationSettings {
+  emailAlerts: boolean;
+  alertEmail: string;
+  budgetThresholds: number[];
+  notifyOnKeyRevoke: boolean;
+}
+
+export interface SystemSettings {
+  maintenanceMode: boolean;
+  featureFlags: Record<string, boolean>;
+}
+
+export interface AllSettings {
+  general: GeneralSettings;
+  security: SecuritySettings;
+  ai: AiSettings;
+  notifications: NotificationSettings;
+  system: SystemSettings;
 }
 
 /** Returned once by create and rotate. The only place the full key ever appears. */

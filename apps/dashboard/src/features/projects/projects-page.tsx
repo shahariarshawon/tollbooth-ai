@@ -34,7 +34,7 @@ function ProjectsContent() {
     <>
       <PageHeader
         title="Projects"
-        description="Applications that send AI requests through Tollbooth."
+        description="Applications and services that send AI requests through Tollbooth."
         actions={
           canManage && (
             <Button onClick={() => setDialog({ type: 'form' })}>
@@ -43,9 +43,6 @@ function ProjectsContent() {
           )
         }
       />
-      <p className="text-sm text-muted-foreground">
-        Preview: project data is stored in your browser session until the projects API ships.
-      </p>
 
       <Card>
         <QueryBoundary

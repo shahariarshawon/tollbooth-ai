@@ -4,8 +4,10 @@ import { http } from './api-client';
 export interface CreateApiKeyInput {
   name: string;
   projectId: string;
-  permissions: string[];
+  teamId?: string;
+  permissions?: string[];
   rateLimit?: number;
+  expiresAt?: string;
 }
 
 // Planned REST contract. Served by the mock adapter until the backend ships these routes.
@@ -21,4 +23,8 @@ export const apiKeyService = {
 
   revoke: async (id: string): Promise<ApiKey> =>
     (await http.post<ApiKey>(`/api-keys/${id}/revoke`)).data,
+
+  delete: async (id: string): Promise<void> => {
+    await http.delete(`/api-keys/${id}`);
+  },
 };

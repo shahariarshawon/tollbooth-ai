@@ -39,8 +39,16 @@ enum TenantStatus {
 enum UserRole {
   SUPER_ADMIN
   TENANT_ADMIN
+  TEAM_ADMIN
   DEVELOPER
   FINANCE
+  VIEWER
+}
+
+enum TeamMemberRole {
+  LEAD
+  MEMBER
+  VIEWER
 }
 
 enum UserStatus {
@@ -110,6 +118,9 @@ model Tenant {
   ledgerEntries LedgerEntry[]
   auditLogs     AuditLog[]
   alerts        Alert[]
+  teams         Team[]
+  subscription  TenantSubscription?
+  settings      SystemSetting[]
 
   @@map("tenants")
 }
@@ -128,8 +139,9 @@ model User {
   updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
 
   tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  auditLogs     AuditLog[]
-  refreshTokens RefreshToken[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+  teamMemberships TeamMember[]
 
   @@index([tenantId])
   @@map("users")
@@ -160,11 +172,15 @@ model Project {
   tenantId    String        @db.Uuid
   name        String        @db.VarChar(200)
   description String?
-  status      ProjectStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
+  status        ProjectStatus @default(ACTIVE)
+  teamId        String?       @db.Uuid
+  allowedModels String[]      @default([])
+  monthlyBudget Decimal?      @db.Decimal(18, 4)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  team       Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
   apiKeys    ApiKey[]
   aiRequests AiRequest[]
 
@@ -178,6 +194,7 @@ model ApiKey {
   id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId    String       @db.Uuid
   projectId   String       @db.Uuid
+  teamId      String?      @db.Uuid
   // SHA-256 hex digest of the raw key. The raw key is shown once at creation and never stored.
   keyHash     String       @unique @db.VarChar(64)
   // First characters of the raw key, safe to display so people can tell keys apart.
@@ -194,6 +211,7 @@ model ApiKey {
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project    Project     @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  team       Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
   aiRequests AiRequest[]
 
   @@unique([id, tenantId])
@@ -374,3 +392,115 @@ model Alert {
   @@index([tenantId, status, createdAt(sort: Desc)])
   @@map("alerts")
 }
+
+// ---------------------------------------------------------------------------
+// Team Management, Limits, Subscriptions & Settings
+// ---------------------------------------------------------------------------
+
+model Team {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String       @db.Uuid
+  name          String       @db.VarChar(200)
+  description   String?
+  rateLimitRpm  Int?
+  rateLimitRpd  Int?
+  tokenLimitTpm Int?
+  tokenLimitTpd Int?
+  dailyBudget   Decimal?     @db.Decimal(18, 4)
+  monthlyBudget Decimal?     @db.Decimal(18, 4)
+  allowedModels String[]     @default([])
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @db.Timestamptz(3)
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  projects      Project[]
+  apiKeys       ApiKey[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId    String         @db.Uuid
+  userId    String         @db.Uuid
+  role      TeamMemberRole @default(MEMBER)
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+
+  team      Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("team_members")
+}
+
+model Permission {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?
+  module      String   @db.VarChar(100)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("permissions")
+}
+
+model BillingPlan {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String               @db.VarChar(100)
+  code               String               @unique @db.VarChar(50)
+  description        String?
+  monthlyPrice       Decimal              @default(0) @db.Decimal(12, 2)
+  monthlyBudgetLimit Decimal              @default(100) @db.Decimal(18, 4)
+  dailyBudgetLimit   Decimal?             @db.Decimal(18, 4)
+  requestsPerMinute  Int                  @default(60)
+  requestsPerDay     Int                  @default(10000)
+  tokensPerMinute    Int                  @default(100000)
+  tokensPerDay       Int                  @default(5000000)
+  features           String[]             @default([])
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+
+  subscriptions      TenantSubscription[]
+
+  @@map("billing_plans")
+}
+
+model TenantSubscription {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String      @unique @db.Uuid
+  planId             String      @db.Uuid
+  status             String      @default("ACTIVE") @db.VarChar(50)
+  currentPeriodStart DateTime    @default(now()) @db.Timestamptz(3)
+  currentPeriodEnd   DateTime    @db.Timestamptz(3)
+  monthlyBudgetLimit Decimal?    @db.Decimal(18, 4)
+  dailyBudgetLimit   Decimal?    @db.Decimal(18, 4)
+  createdAt          DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime    @updatedAt @db.Timestamptz(3)
+
+  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan               BillingPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@map("tenant_subscriptions")
+}
+
+model SystemSetting {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?  @db.Uuid
+  category  String   @db.VarChar(50)
+  key       String   @db.VarChar(100)
+  value     Json     @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, category, key])
+  @@index([tenantId, category])
+  @@map("system_settings")
+}
+

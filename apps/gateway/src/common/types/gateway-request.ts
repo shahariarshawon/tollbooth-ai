@@ -11,6 +11,8 @@ export interface ApiKeyAuth {
   permissions: string[];
   /** Requests per minute for this key; null means the plan default. */
   rateLimit: number | null;
+  teamId?: string | null;
+  allowedModels?: string[];
 }
 
 export interface GatewayRequest extends Request {

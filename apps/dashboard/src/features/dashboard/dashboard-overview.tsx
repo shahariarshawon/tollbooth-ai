@@ -34,7 +34,7 @@ export function DashboardOverview() {
       <PageHeader title="Dashboard" description="Usage and spend across your AI gateway." />
       <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
         <Info className="size-4 shrink-0" aria-hidden />
-        Sample data. Live usage appears here once the gateway is connected.
+        Live usage telemetry and active provider health across your AI gateway.
       </p>
       <QueryBoundary query={overview} loading={<OverviewSkeleton />}>
         {(data) => (
