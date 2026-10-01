@@ -8,8 +8,9 @@ cost, enforces budgets and rate limits, and stops sending traffic to a provider 
 
 > **Status: the gateway is provider-agnostic, with Gemini active.** Foundation, database, the control plane
 > (authentication, RBAC, tenant isolation), the dashboard, the OpenAI-compatible gateway and its Redis traffic
-> controls (rate limits, token quotas, budget counters, circuit breaker) are in place. The dashboard shows
-> sample data for projects, API keys and usage until their backends exist.
+> controls (rate limits, token quotas, budget counters, circuit breaker), provider-independent cost tracking
+> and a usage ledger, and a Kafka event pipeline with a worker consuming it are all in place. The dashboard
+> shows sample data for projects, API keys and usage until their backends exist.
 
 ## Architecture overview
 
@@ -150,11 +151,16 @@ reuse them outside local development.
 5. **Phase 4**: LLM gateway core (done): [docs/api/gateway-api.md](docs/api/gateway-api.md)
 6. **Phase 5**: Redis layer: rate limits, token quotas, budget counters, circuit breaker (done):
    [docs/architecture/redis-layer.md](docs/architecture/redis-layer.md)
-   and provider-agnostic routing with Gemini active: [docs/architecture/provider-architecture.md](docs/architecture/provider-architecture.md)
-7. **Next**: projects and API key management endpoints in the control plane
-8. Cost, usage tracking and billing, including rebuilding budget counters from the database
-9. Kafka event pipeline and workers
-10. AI security layer (PII detection, prompt filtering), more providers and failover
-11. Analytics, then observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
+7. **Phase 6**: provider-agnostic routing with Gemini active, OpenAI and Anthropic ready (done):
+   [docs/architecture/provider-architecture.md](docs/architecture/provider-architecture.md) and
+   [docs/architecture/provider-router.md](docs/architecture/provider-router.md)
+8. **Phase 7**: usage metering, provider-independent cost engine, budget enforcement and the usage
+   ledger (done): [docs/architecture/usage-cost-engine.md](docs/architecture/usage-cost-engine.md)
+9. **Phase 8**: Kafka event pipeline and a worker consuming it (done):
+   [docs/architecture/kafka-events.md](docs/architecture/kafka-events.md)
+10. **Next**: projects and API key management endpoints in the control plane
+11. AI security layer (PII detection, prompt filtering), provider failover
+12. Turning the logged Kafka events into real work: usage rollups, budget alerts, a billing export
+13. Analytics, then observability (OpenTelemetry, Prometheus, Grafana) and load testing (k6)
 
 See [docs/development-guidelines.md](docs/development-guidelines.md) for coding and git conventions.

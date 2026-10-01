@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { LedgerTransactionType } from '@tollbooth/database';
+import { KAFKA_PROVIDER_TOPIC, KAFKA_USAGE_TOPIC, KafkaService } from '@tollbooth/kafka';
+import type { ProviderFailedEvent, UsageCompletedEvent } from '@tollbooth/kafka';
 import type { RecordInput } from '../requests/request.service';
 import { RequestService } from '../requests/request.service';
 import type { TokenUsage } from '../requests/request.service';
@@ -7,12 +9,17 @@ import { UsageRepository } from './usage.repository';
 
 /**
  * Pipeline step 9, in full: record what happened (`ai_requests`, via `RequestService`, unchanged from
- * earlier phases) and, for a successful call, what it cost (`ledger_entries`, new in Phase 7).
+ * earlier phases), what it cost (`ledger_entries`, Phase 7), and announce it on Kafka (Phase 8) for
+ * whatever consumes it next (today, just the worker logging that it arrived).
  *
  * Token counting (`TokenCounter`) and cost calculation (`budget/cost-estimator.ts`) already happen
  * upstream, in the provider and in `TrafficControlService.complete`, the same provider-independent way
- * for every provider; this service only files the two records of the outcome. It is the one thing
- * `GatewayService` calls after a request finishes, so it never has to remember to write both.
+ * for every provider; this service only files the record of the outcome. It is the one thing
+ * `GatewayService` calls after a request finishes, so it never has to remember to do all three.
+ *
+ * The Kafka publish is fire-and-forget (not awaited): it must never add latency or a new way to fail to
+ * a request that has already been decided. `KafkaService.publish` already never throws, so this is safe
+ * even unawaited; see `@tollbooth/kafka`.
  */
 @Injectable()
 export class UsageService {
@@ -21,13 +28,15 @@ export class UsageService {
   constructor(
     private readonly requests: RequestService,
     private readonly ledger: UsageRepository,
+    private readonly kafka: KafkaService,
   ) {}
 
   /**
    * A successful call: the `ai_requests` row, then an `AI_USAGE` ledger entry for what it actually cost
    * (0 on a free tier — recorded all the same, so free-tier usage leaves the same audit trail as paid
-   * usage; see Task 8). The ledger entry is still written even if the `ai_requests` row failed to save,
-   * just without a `requestId` to link, because the money (or free-tier usage) still happened.
+   * usage; see Task 8), then a `usage.completed` event. The ledger entry is still written even if the
+   * `ai_requests` row failed to save, just without a `requestId` to link, because the money (or
+   * free-tier usage) still happened; the event carries that same (possibly absent) id.
    */
   async recordSuccess(
     input: RecordInput & { usage: TokenUsage; estimatedCostUsd: string },
@@ -40,16 +49,46 @@ export class UsageService {
       amountUsd: chargeAmount(input.estimatedCostUsd),
       description: `${input.provider} ${input.model}`,
     });
+
+    const event: UsageCompletedEvent = {
+      requestId: requestId ?? '',
+      tenantId: input.auth.tenantId,
+      projectId: input.auth.projectId,
+      provider: input.provider,
+      model: input.model,
+      requestTokens: input.usage.requestTokens,
+      responseTokens: input.usage.responseTokens,
+      totalTokens: input.usage.totalTokens,
+      estimatedCost: input.estimatedCostUsd,
+      latencyMs: Math.round(input.latencyMs),
+      timestamp: new Date().toISOString(),
+    };
+    void this.kafka.publish(KAFKA_USAGE_TOPIC, event, input.auth.tenantId);
   }
 
   /**
    * A failed call: recorded for the audit trail. Nothing is charged, because `TrafficControlService`
    * already released whatever budget was held for it before this is called, so there is no ledger entry.
+   * A `provider.failed` event is published for a real provider failure (`errorKind` is not
+   * `bad_request`): that is what counts against the provider everywhere else in the system too (the
+   * circuit breaker), so it is the same definition of "failed" here.
    */
   async recordFailure(
-    input: RecordInput & { requestTokens: number; errorMessage: string },
+    input: RecordInput & { requestTokens: number; errorKind: string; errorMessage: string },
   ): Promise<void> {
-    await this.requests.recordFailure(input);
+    const requestId = await this.requests.recordFailure(input);
+
+    if (input.errorKind !== 'bad_request') {
+      const event: ProviderFailedEvent = {
+        requestId: requestId ?? '',
+        tenantId: input.auth.tenantId,
+        provider: input.provider,
+        model: input.model,
+        errorKind: input.errorKind,
+        timestamp: new Date().toISOString(),
+      };
+      void this.kafka.publish(KAFKA_PROVIDER_TOPIC, event, input.auth.tenantId);
+    }
   }
 
   /**

@@ -97,6 +97,7 @@ export class GatewayService {
         model: model.name,
         latencyMs: performance.now() - startedAt,
         requestTokens: estimatedInputTokens,
+        errorKind: failure.kind,
         errorMessage:
           failure.kind === 'bad_request' ? `bad_request: ${failure.message}` : failure.kind,
       });

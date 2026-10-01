@@ -304,6 +304,11 @@ GOOGLE_AI_API_KEY=AIza-test-key-not-real GOOGLE_AI_BASE_URL=http://127.0.0.1:402
 
 ## Not included yet
 
-Streaming responses, other endpoints (`/v1/models`, embeddings), provider failover, billing (the cost stored
-with each request is an estimate, there is no ledger), usage events and content scanning. The request and provider abstractions
-are shaped so each can be added without changing the endpoint.
+Streaming responses, other endpoints (`/v1/models`, embeddings), provider failover, a billing/invoicing
+system (the cost is tracked, in `estimatedCost` and the usage ledger, but there is no invoice), and content
+scanning. The request and provider abstractions are shaped so each can be added without changing the
+endpoint.
+
+Usage _is_ tracked and announced: every call updates `ai_requests` and (for a success) the usage ledger
+(`docs/architecture/usage-cost-engine.md`), and a successful or failed call publishes a Kafka event
+(`docs/architecture/kafka-events.md`) that a worker consumes.

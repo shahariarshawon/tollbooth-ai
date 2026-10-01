@@ -1,0 +1,29 @@
+{
+  "name": "@tollbooth/kafka",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Kafka producer/consumer wrapper and event definitions",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
+    "test:e2e": "jest --config test/jest-e2e.json --runInBand"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ]
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.7",
+    "@tollbooth/config": "workspace:*",
+    "kafkajs": "^2.2.4"
+  },
+  "devDependencies": {
+    "reflect-metadata": "^0.2.2"
+  }
+}

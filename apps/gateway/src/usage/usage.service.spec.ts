@@ -1,3 +1,5 @@
+import { KAFKA_PROVIDER_TOPIC, KAFKA_USAGE_TOPIC } from '@tollbooth/kafka';
+import type { KafkaService } from '@tollbooth/kafka';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
 import type { RequestService } from '../requests/request.service';
 import { UsageService } from './usage.service';
@@ -20,7 +22,10 @@ function build() {
   const ledger = {
     recordLedgerEntry: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<UsageRepository>;
-  return { service: new UsageService(requests, ledger), requests, ledger };
+  const kafka = {
+    publish: jest.fn().mockResolvedValue(true),
+  } as unknown as jest.Mocked<KafkaService>;
+  return { service: new UsageService(requests, ledger, kafka), requests, ledger, kafka };
 }
 
 describe('UsageService', () => {
@@ -46,6 +51,37 @@ describe('UsageService', () => {
         amountUsd: '-0.00000500',
         description: 'GOOGLE gemini-2.0-flash',
       });
+    });
+
+    it('publishes a usage.completed event, keyed by tenant', async () => {
+      const { service, requests, kafka } = build();
+      requests.recordSuccess.mockResolvedValue('req-1');
+
+      await service.recordSuccess({
+        auth,
+        provider: 'GOOGLE',
+        model: 'gemini-2.0-flash',
+        latencyMs: 120.6,
+        usage: { requestTokens: 11, responseTokens: 7, totalTokens: 18 },
+        estimatedCostUsd: '0.00000500',
+      });
+
+      expect(kafka.publish).toHaveBeenCalledWith(
+        KAFKA_USAGE_TOPIC,
+        expect.objectContaining({
+          requestId: 'req-1',
+          tenantId: 'tenant-1',
+          projectId: 'project-1',
+          provider: 'GOOGLE',
+          model: 'gemini-2.0-flash',
+          requestTokens: 11,
+          responseTokens: 7,
+          totalTokens: 18,
+          estimatedCost: '0.00000500',
+          latencyMs: 121,
+        }),
+        'tenant-1',
+      );
     });
 
     it('records a free-tier (zero-cost) call as a 0 ledger entry, not skipped', async () => {
@@ -112,11 +148,55 @@ describe('UsageService', () => {
         model: 'gemini-2.0-flash',
         latencyMs: 50,
         requestTokens: 11,
+        errorKind: 'timeout',
         errorMessage: 'timeout',
       });
 
       expect(requests.recordFailure).toHaveBeenCalledTimes(1);
       expect(ledger.recordLedgerEntry).not.toHaveBeenCalled();
+    });
+
+    it('publishes a provider.failed event for a real provider failure', async () => {
+      const { service, requests, kafka } = build();
+      requests.recordFailure.mockResolvedValue('req-4');
+
+      await service.recordFailure({
+        auth,
+        provider: 'GOOGLE',
+        model: 'gemini-2.0-flash',
+        latencyMs: 50,
+        requestTokens: 11,
+        errorKind: 'timeout',
+        errorMessage: 'timeout',
+      });
+
+      expect(kafka.publish).toHaveBeenCalledWith(
+        KAFKA_PROVIDER_TOPIC,
+        expect.objectContaining({
+          requestId: 'req-4',
+          tenantId: 'tenant-1',
+          provider: 'GOOGLE',
+          model: 'gemini-2.0-flash',
+          errorKind: 'timeout',
+        }),
+        'tenant-1',
+      );
+    });
+
+    it('does not publish anything for a bad_request: the caller erred, not the provider', async () => {
+      const { service, kafka } = build();
+
+      await service.recordFailure({
+        auth,
+        provider: 'GOOGLE',
+        model: 'gemini-2.0-flash',
+        latencyMs: 50,
+        requestTokens: 11,
+        errorKind: 'bad_request',
+        errorMessage: 'bad_request: temperature must be <= 1',
+      });
+
+      expect(kafka.publish).not.toHaveBeenCalled();
     });
   });
 

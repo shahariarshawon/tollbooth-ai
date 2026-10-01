@@ -24,6 +24,7 @@
     "@nestjs/platform-express": "^11.2.7",
     "@tollbooth/config": "workspace:*",
     "@tollbooth/database": "workspace:*",
+    "@tollbooth/kafka": "workspace:*",
     "@tollbooth/shared": "workspace:*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
