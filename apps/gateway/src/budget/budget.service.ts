@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AlertService } from '../alerts/alert.service';
 import { BudgetExceededException } from '../common/errors/traffic.exceptions';
 import { logEvent } from '../common/logging/structured-logger';
 import { RedisFailurePolicy } from '../redis/redis-failure.policy';
@@ -170,6 +171,7 @@ export class BudgetService {
   constructor(
     private readonly redis: RedisService,
     private readonly policy: RedisFailurePolicy,
+    private readonly alerts: AlertService,
   ) {}
 
   /** What is left, and whether `amountMicroUsd` would fit. Does not change anything. */
@@ -242,6 +244,12 @@ export class BudgetService {
           unit: 'micro_usd',
         },
         'warn',
+      );
+      void this.alerts.create(
+        tenantId,
+        'BUDGET_LIMIT',
+        `The ${period}ly budget has been reached: $${(status.monthlyLimit / 1_000_000).toFixed(2)} limit.`,
+        'CRITICAL',
       );
       throw new BudgetExceededException();
     }

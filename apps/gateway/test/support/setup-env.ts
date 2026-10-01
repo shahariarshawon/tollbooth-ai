@@ -15,8 +15,10 @@ process.env['GATEWAY_MAX_TOKENS'] = '4096';
 process.env['GATEWAY_PROVIDER_TIMEOUT_MS'] = '1500';
 // Small but non-zero, so retry tests can exhaust it (3 total attempts) without the suite getting slow.
 process.env['GATEWAY_MAX_PROVIDER_RETRIES'] = '2';
-// Small, so a test that makes the fake security service hang does not slow the suite down.
-process.env['GATEWAY_SECURITY_TIMEOUT_MS'] = '500';
+// Small, so a test that makes the fake security service hang does not slow the suite down, but not so
+// small that an ordinary (non-hanging) response occasionally misses it while the full suite is under
+// load (e.g. --runInBand running a dozen files back to back).
+process.env['GATEWAY_SECURITY_TIMEOUT_MS'] = '2000';
 delete process.env['GATEWAY_PORT'];
 
 if (!process.env['DATABASE_URL']) {

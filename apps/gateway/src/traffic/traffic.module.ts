@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AlertModule } from '../alerts/alert.module';
 import { BudgetGuard } from '../budget/budget.guard';
 import { BudgetService } from '../budget/budget.service';
 import { CIRCUIT_OPTIONS, CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
@@ -13,6 +14,7 @@ import { TrafficControlService } from './traffic-control.service';
 import { WindowCounter } from './window-counter';
 
 @Module({
+  imports: [AlertModule],
   providers: [
     { provide: PLAN_LIMITS, useValue: DEFAULT_PLAN_LIMITS },
     {

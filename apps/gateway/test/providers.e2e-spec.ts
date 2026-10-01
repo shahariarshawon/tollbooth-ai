@@ -147,6 +147,34 @@ describe('AI provider abstraction (e2e)', () => {
       expect((await lastRecord()).errorMessage).toBe('rate_limited');
     });
 
+    it('creates a PROVIDER_ERROR alert (Phase 11, Task 3) for a real provider failure', async () => {
+      ctx.fakes.gemini.behavior = 'server-error';
+      await post().expect(503);
+
+      const alert = await ctx.prisma.alert.findFirst({
+        where: { tenantId: fixture.tenantId, type: 'PROVIDER_ERROR' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(alert).toMatchObject({
+        tenantId: fixture.tenantId,
+        type: 'PROVIDER_ERROR',
+        status: 'UNREAD',
+      });
+    });
+
+    it('creates no alert for a bad_request: the caller erred, not the provider', async () => {
+      const before = await ctx.prisma.alert.count({
+        where: { tenantId: fixture.tenantId, type: 'PROVIDER_ERROR' },
+      });
+      ctx.fakes.gemini.behavior = 'blocked';
+      await post().expect(400);
+
+      const after = await ctx.prisma.alert.count({
+        where: { tenantId: fixture.tenantId, type: 'PROVIDER_ERROR' },
+      });
+      expect(after).toBe(before);
+    });
+
     it('gives up on a Gemini that never answers', async () => {
       ctx.fakes.gemini.behavior = 'hang';
       const started = Date.now();

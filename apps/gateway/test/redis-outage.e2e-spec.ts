@@ -25,8 +25,11 @@ describe('Gateway when Redis is unreachable (e2e)', () => {
     });
     beforeEach(() => ctx.fake.received.splice(0));
 
-    it('starts, and its basic health check still answers', async () => {
-      await http(ctx).get('/health').expect(200);
+    it('starts, and its health check still answers (degraded because redis is down)', async () => {
+      const res = await http(ctx).get('/health').expect(503);
+      expect(res.body.status).toBe('degraded');
+      expect(res.body.checks.redis).toBe('error');
+      expect(res.body.checks.postgres).toBe('ok');
     });
 
     it('reports Redis as unhealthy, without revealing where it lives', async () => {

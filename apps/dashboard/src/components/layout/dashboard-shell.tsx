@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Logo, Navbar } from '@/components/ui/navbar';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/states';
+import { NotificationBell } from '@/features/alerts/notification-bell';
 import { useAuth } from '@/features/auth/auth-provider';
 import { AppSidebar } from '@/features/navigation/app-sidebar';
 import { TenantScopePicker } from '@/features/navigation/tenant-scope-picker';
@@ -41,6 +42,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh">
       <Navbar onMenuClick={() => setNavOpen(true)}>
         <TenantScopePicker className="hidden w-44 md:block" />
+        <NotificationBell />
         <UserMenu />
       </Navbar>
 

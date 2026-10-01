@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { LedgerTransactionType } from '@tollbooth/database';
 import { KAFKA_PROVIDER_TOPIC, KAFKA_USAGE_TOPIC, KafkaService } from '@tollbooth/kafka';
 import type { ProviderFailedEvent, UsageCompletedEvent } from '@tollbooth/kafka';
+import { AlertService } from '../alerts/alert.service';
+import { recordAiFailure, recordAiSuccess } from '../metrics/metrics';
 import type { RecordInput } from '../requests/request.service';
 import { RequestService } from '../requests/request.service';
 import type { TokenUsage } from '../requests/request.service';
@@ -29,6 +31,7 @@ export class UsageService {
     private readonly requests: RequestService,
     private readonly ledger: UsageRepository,
     private readonly kafka: KafkaService,
+    private readonly alerts: AlertService,
   ) {}
 
   /**
@@ -64,6 +67,13 @@ export class UsageService {
       timestamp: new Date().toISOString(),
     };
     void this.kafka.publish(KAFKA_USAGE_TOPIC, event, input.auth.tenantId);
+    recordAiSuccess(
+      input.provider,
+      input.model,
+      { request: input.usage.requestTokens, response: input.usage.responseTokens },
+      input.estimatedCostUsd,
+      input.latencyMs,
+    );
   }
 
   /**
@@ -88,7 +98,14 @@ export class UsageService {
         timestamp: new Date().toISOString(),
       };
       void this.kafka.publish(KAFKA_PROVIDER_TOPIC, event, input.auth.tenantId);
+      void this.alerts.create(
+        input.auth.tenantId,
+        'PROVIDER_ERROR',
+        `${input.provider} ${input.model} failed: ${input.errorKind}.`,
+        'WARNING',
+      );
     }
+    recordAiFailure(input.provider, input.model, input.errorKind);
   }
 
   /**

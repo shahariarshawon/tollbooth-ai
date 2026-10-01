@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   Building2,
   CreditCard,
   FolderKanban,
@@ -51,6 +52,8 @@ export const NAV_ITEMS: AppNavItem[] = [
     icon: CreditCard,
     permission: Permission.VIEW_BILLING,
   },
+  // No permission: alerts are tenant-wide operational notices, same as the control plane's endpoints.
+  { label: 'Alerts', href: '/dashboard/alerts', icon: Bell },
   {
     label: 'Audit Logs',
     href: '/dashboard/audit-logs',

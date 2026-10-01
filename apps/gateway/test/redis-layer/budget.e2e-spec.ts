@@ -1,3 +1,4 @@
+import type { AlertService } from '../../src/alerts/alert.service';
 import { BudgetService } from '../../src/budget/budget.service';
 import { setLogSink } from '../../src/common/logging/structured-logger';
 import { RedisKeys, dayBucket, monthBucket } from '../../src/redis/redis.constants';
@@ -7,13 +8,20 @@ import type { RedisHarness } from '../support/redis-harness';
 const NOW = new Date('2026-10-15T12:00:00.000Z');
 const LIMIT = 1_000_000; // one dollar, in micro-dollars
 
+/** This file is about the Redis-backed counters, not alerting (see alerts/alert.service.spec.ts and
+ *  providers.e2e-spec.ts for that); a stub is enough to satisfy BudgetService's constructor. */
+const fakeAlerts = () =>
+  ({ create: jest.fn().mockResolvedValue(undefined) }) as unknown as AlertService;
+
 describe('Budget counters (integration)', () => {
   let harness: RedisHarness;
   let budget: BudgetService;
+  let alerts: ReturnType<typeof fakeAlerts>;
 
   beforeAll(async () => {
     harness = await createRedisHarness();
-    budget = new BudgetService(harness.redis, harness.policy);
+    alerts = fakeAlerts();
+    budget = new BudgetService(harness.redis, harness.policy, alerts);
   });
   afterAll(() => harness.close());
   afterEach(() => setLogSink(null));
@@ -67,6 +75,22 @@ describe('Budget counters (integration)', () => {
       payload: { code: 'budget_exceeded', type: 'budget_error' },
     });
     expect((await budget.snapshot(tenantId, NOW))?.reserved).toBe(900_000);
+  });
+
+  it('creates a BUDGET_LIMIT alert when the budget is exceeded (Task 7)', async () => {
+    const tenantId = harness.tenantId();
+    await budget.reserveBudget(tenantId, LIMIT, 900_000, {}, NOW);
+
+    await expect(budget.reserveBudget(tenantId, LIMIT, 200_000, {}, NOW)).rejects.toMatchObject({
+      status: 402,
+    });
+
+    expect(alerts.create).toHaveBeenCalledWith(
+      tenantId,
+      'BUDGET_LIMIT',
+      expect.any(String),
+      'CRITICAL',
+    );
   });
 
   it('logs what was asked for and what was left when it blocks', async () => {
@@ -261,10 +285,16 @@ describe('Budget counters (integration)', () => {
       const open = await createRedisHarness({ ...DEAD_REDIS, GATEWAY_FAIL_OPEN: true });
       try {
         await expect(
-          new BudgetService(closed.redis, closed.policy).reserveBudget('t', LIMIT, 10, {}, NOW),
+          new BudgetService(closed.redis, closed.policy, fakeAlerts()).reserveBudget(
+            't',
+            LIMIT,
+            10,
+            {},
+            NOW,
+          ),
         ).rejects.toMatchObject({ status: 503 });
 
-        const lenient = new BudgetService(open.redis, open.policy);
+        const lenient = new BudgetService(open.redis, open.policy, fakeAlerts());
         await expect(lenient.reserveBudget('t', LIMIT, 10, {}, NOW)).resolves.toBeNull();
         await expect(lenient.checkBudget('t', LIMIT, 10, NOW)).resolves.toMatchObject({
           bypassed: true,

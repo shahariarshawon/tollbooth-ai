@@ -61,6 +61,24 @@ describe('AI Security Check (e2e)', () => {
       expect(ctx.fake.received).toHaveLength(0);
     });
 
+    it('creates a SECURITY_ALERT alert (Phase 11, Task 3) for the blocked request', async () => {
+      ctx.security.behavior = 'blocked';
+
+      await post().expect(400);
+
+      const alert = await ctx.prisma.alert.findFirst({
+        where: { tenantId: fixture.tenantId, type: 'SECURITY_ALERT' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(alert).toMatchObject({
+        tenantId: fixture.tenantId,
+        type: 'SECURITY_ALERT',
+        status: 'UNREAD',
+        severity: 'CRITICAL',
+      });
+      expect(alert?.message).toContain('prompt_injection');
+    });
+
     it('does not record a blocked request in ai_requests: it never reached a provider', async () => {
       const before = await ctx.prisma.aiRequest.count({ where: { tenantId: fixture.tenantId } });
       ctx.security.behavior = 'blocked';

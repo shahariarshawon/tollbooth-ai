@@ -109,6 +109,7 @@ model Tenant {
   usageEvents   UsageEvent[]
   ledgerEntries LedgerEntry[]
   auditLogs     AuditLog[]
+  alerts        Alert[]
 
   @@map("tenants")
 }
@@ -331,4 +332,45 @@ model AuditLog {
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([userId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Alerts (Phase 11)
+// ---------------------------------------------------------------------------
+
+enum AlertType {
+  BUDGET_LIMIT
+  HIGH_USAGE
+  PROVIDER_ERROR
+  SECURITY_ALERT
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  UNREAD
+  READ
+}
+
+// Written by the gateway when it detects the event (budget, provider, security); read and marked read
+// by the control plane for the dashboard. The same cross-service-via-shared-table pattern as
+// AiRequest/LedgerEntry (Phase 7) and the data Phase 10's analytics reads.
+model Alert {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String        @db.Uuid
+  type      AlertType
+  message   String
+  severity  AlertSeverity @default(WARNING)
+  status    AlertStatus   @default(UNREAD)
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  readAt    DateTime?     @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@map("alerts")
 }

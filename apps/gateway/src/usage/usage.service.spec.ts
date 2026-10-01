@@ -1,5 +1,6 @@
 import { KAFKA_PROVIDER_TOPIC, KAFKA_USAGE_TOPIC } from '@tollbooth/kafka';
 import type { KafkaService } from '@tollbooth/kafka';
+import type { AlertService } from '../alerts/alert.service';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
 import type { RequestService } from '../requests/request.service';
 import { UsageService } from './usage.service';
@@ -25,7 +26,16 @@ function build() {
   const kafka = {
     publish: jest.fn().mockResolvedValue(true),
   } as unknown as jest.Mocked<KafkaService>;
-  return { service: new UsageService(requests, ledger, kafka), requests, ledger, kafka };
+  const alerts = {
+    create: jest.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<AlertService>;
+  return {
+    service: new UsageService(requests, ledger, kafka, alerts),
+    requests,
+    ledger,
+    kafka,
+    alerts,
+  };
 }
 
 describe('UsageService', () => {
@@ -184,7 +194,7 @@ describe('UsageService', () => {
     });
 
     it('does not publish anything for a bad_request: the caller erred, not the provider', async () => {
-      const { service, kafka } = build();
+      const { service, kafka, alerts } = build();
 
       await service.recordFailure({
         auth,
@@ -197,6 +207,28 @@ describe('UsageService', () => {
       });
 
       expect(kafka.publish).not.toHaveBeenCalled();
+      expect(alerts.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a PROVIDER_ERROR alert for a real provider failure', async () => {
+      const { service, alerts } = build();
+
+      await service.recordFailure({
+        auth,
+        provider: 'GOOGLE',
+        model: 'gemini-2.0-flash',
+        latencyMs: 50,
+        requestTokens: 11,
+        errorKind: 'timeout',
+        errorMessage: 'timeout',
+      });
+
+      expect(alerts.create).toHaveBeenCalledWith(
+        'tenant-1',
+        'PROVIDER_ERROR',
+        expect.stringContaining('timeout'),
+        'WARNING',
+      );
     });
   });
 

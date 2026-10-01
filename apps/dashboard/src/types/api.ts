@@ -156,3 +156,22 @@ export interface AnalyticsCost {
   monthlyCost: { month: string; cost: number }[];
   providerCostBreakdown: NamedCount[];
 }
+
+// ---------------------------------------------------------------------------
+// Alerts (Phase 11). Real endpoints on the control plane (apps/control-plane/src/alerts), written by
+// the gateway when it detects a budget, provider or security event (apps/gateway/src/alerts).
+// ---------------------------------------------------------------------------
+
+export type AlertType = 'BUDGET_LIMIT' | 'HIGH_USAGE' | 'PROVIDER_ERROR' | 'SECURITY_ALERT';
+export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+export type AlertStatus = 'UNREAD' | 'READ';
+
+export interface Alert {
+  id: string;
+  type: AlertType;
+  message: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  createdAt: string;
+  readAt: string | null;
+}

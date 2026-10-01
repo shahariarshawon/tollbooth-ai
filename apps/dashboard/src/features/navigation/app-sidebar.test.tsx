@@ -18,6 +18,7 @@ const ALL = [
   'API Keys',
   'Usage Analytics',
   'Billing',
+  'Alerts',
   'Audit Logs',
   'Settings',
 ];
@@ -42,12 +43,13 @@ describe('AppSidebar permissions', () => {
         'API Keys',
         'Usage Analytics',
         'Billing',
+        'Alerts',
         'Audit Logs',
         'Settings',
       ],
     ],
-    ['DEVELOPER', ['Dashboard', 'Projects', 'API Keys', 'Usage Analytics']],
-    ['FINANCE', ['Dashboard', 'Projects', 'Usage Analytics', 'Billing']],
+    ['DEVELOPER', ['Dashboard', 'Projects', 'API Keys', 'Usage Analytics', 'Alerts']],
+    ['FINANCE', ['Dashboard', 'Projects', 'Usage Analytics', 'Billing', 'Alerts']],
   ])('shows the right sections to %s', (userRole, expected) => {
     role = userRole;
     render(<AppSidebar />);

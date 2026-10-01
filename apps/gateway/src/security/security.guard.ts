@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { AlertService } from '../alerts/alert.service';
 import { GatewayErrors } from '../common/errors/gateway.exception';
 import { logEvent } from '../common/logging/structured-logger';
 import type { GatewayRequest } from '../common/types/gateway-request';
@@ -17,7 +18,10 @@ import { SecurityService } from './security.service';
  */
 @Injectable()
 export class SecurityGuard implements CanActivate {
-  constructor(private readonly security: SecurityService) {}
+  constructor(
+    private readonly security: SecurityService,
+    private readonly alerts: AlertService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<GatewayRequest>();
@@ -36,6 +40,14 @@ export class SecurityGuard implements CanActivate {
         },
         'warn',
       );
+      if (request.auth) {
+        void this.alerts.create(
+          request.auth.tenantId,
+          'SECURITY_ALERT',
+          `A request was blocked by the content safety check (${types}).`,
+          'CRITICAL',
+        );
+      }
       throw GatewayErrors.contentPolicyViolation(
         `The request was blocked by the content safety check (${types}).`,
       );

@@ -1,5 +1,6 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { AlertModule } from './alerts/alert.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     TenantsModule,
     AnalyticsModule,
+    AlertModule,
   ],
   controllers: [HealthController],
   providers: [
