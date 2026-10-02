@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import type { BillingPlanItem } from '@/types/api';
 import { errorMessage } from '@/utils/errors';
 import { useBillingMutations, useBillingPlans } from './hooks';
 

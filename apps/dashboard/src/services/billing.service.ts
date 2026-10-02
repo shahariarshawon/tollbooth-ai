@@ -22,9 +22,9 @@ export const billingService = {
   listPlans: async (): Promise<BillingPlanItem[]> =>
     (await http.get<BillingPlanItem[]>('/billing/plans')).data,
 
-  assignSubscription: async (input: AssignSubscriptionInput): Promise<any> =>
+  assignSubscription: async (input: AssignSubscriptionInput): Promise<unknown> =>
     (await http.post('/billing/subscription', input)).data,
 
-  updateLimits: async (input: UpdateBillingLimitsInput): Promise<any> =>
+  updateLimits: async (input: UpdateBillingLimitsInput): Promise<unknown> =>
     (await http.patch('/billing/limits', input)).data,
 };

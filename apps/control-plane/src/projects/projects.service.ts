@@ -102,7 +102,7 @@ export class ProjectsService {
     };
   }
 
-  async create(tenantId: string, dto: CreateProjectDto, actorUserId?: string): Promise<any> {
+  async create(tenantId: string, dto: CreateProjectDto, actorUserId?: string) {
     const existing = await this.prisma.project.findUnique({
       where: { tenantId_name: { tenantId, name: dto.name.trim() } },
     });
@@ -141,7 +141,7 @@ export class ProjectsService {
     return project;
   }
 
-  async update(tenantId: string, id: string, dto: UpdateProjectDto, actorUserId?: string): Promise<any> {
+  async update(tenantId: string, id: string, dto: UpdateProjectDto, actorUserId?: string) {
     await this.getById(tenantId, id);
 
     if (dto.name) {

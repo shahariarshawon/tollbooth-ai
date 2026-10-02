@@ -92,6 +92,15 @@ export class UpdateNotificationSettingsDto {
   @IsOptional()
   @IsBoolean()
   notifyOnKeyRevoke?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  budgetAlertThresholdPercent?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  dailyDigestEnabled?: boolean;
 }
 
 export class UpdateSystemSettingsDto {
@@ -102,4 +111,20 @@ export class UpdateSystemSettingsDto {
   @IsOptional()
   @IsObject()
   featureFlags?: Record<string, boolean>;
+
+  @IsOptional()
+  @IsBoolean()
+  teamLimitsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  streamingEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  piiMaskingEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  promptGuardEnabled?: boolean;
 }

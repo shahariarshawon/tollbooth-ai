@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaService, TenantPlan } from '@tollbooth/database';
+import { PrismaService, TenantPlan } from '@tollbooth/database';
 import { AuditAction } from '../audit/audit-actions';
 import { AuditService } from '../audit/audit.service';
 import type {
@@ -172,14 +172,14 @@ export class BillingService {
     };
   }
 
-  async listPlans(): Promise<any[]> {
+  async listPlans() {
     return this.prisma.billingPlan.findMany({
       where: { isActive: true },
       orderBy: { monthlyPrice: 'asc' },
     });
   }
 
-  async createPlan(dto: CreateBillingPlanDto, actorUserId?: string): Promise<any> {
+  async createPlan(dto: CreateBillingPlanDto, actorUserId?: string) {
     const existing = await this.prisma.billingPlan.findUnique({ where: { code: dto.code } });
     if (existing) throw new BadRequestException(`Plan code "${dto.code}" already exists`);
 
@@ -215,7 +215,7 @@ export class BillingService {
     tenantId: string,
     dto: AssignSubscriptionDto,
     actorUserId?: string,
-  ): Promise<any> {
+  ) {
     const plan = await this.prisma.billingPlan.findUnique({ where: { code: dto.planCode } });
     if (!plan) throw new NotFoundException(`Plan ${dto.planCode} not found`);
 
@@ -264,7 +264,7 @@ export class BillingService {
     return subscription;
   }
 
-  async updateLimits(tenantId: string, dto: UpdateBillingLimitsDto, actorUserId?: string): Promise<any> {
+  async updateLimits(tenantId: string, dto: UpdateBillingLimitsDto, actorUserId?: string) {
     const subscription = await this.prisma.tenantSubscription.findUnique({ where: { tenantId } });
     if (!subscription) {
       throw new NotFoundException('No active subscription found for tenant. Assign a plan first.');

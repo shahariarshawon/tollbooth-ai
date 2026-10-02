@@ -1,11 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   Permission,
-  ROLE_MODULES,
   getRolePermissions,
   isModuleAllowed,
 } from '@tollbooth/shared';
 import { PermissionMiddleware } from './permission.middleware';
+import type { RequestWithPermissions } from './permission.middleware';
 
 describe('RBAC & Permission Checks', () => {
   describe('getRolePermissions', () => {
@@ -82,13 +83,14 @@ describe('RBAC & Permission Checks', () => {
     });
 
     it('attaches permissions to authenticated user and calls next()', () => {
-      const req: any = {
-        user: { userId: 'usr-1', tenantId: 'ten-1', role: 'DEVELOPER' },
+      const req = {
+        user: { id: 'usr-1', email: 'dev@test.com', tenantId: 'ten-1', role: 'DEVELOPER' },
         originalUrl: '/projects',
-      };
+      } as unknown as RequestWithPermissions;
+      const res = {} as Response;
       const next = jest.fn();
 
-      middleware.use(req, {} as any, next);
+      middleware.use(req, res, next);
 
       expect(req.permissions).toBeDefined();
       expect(req.permissions).toContain(Permission.PROJECT_READ);
@@ -96,24 +98,26 @@ describe('RBAC & Permission Checks', () => {
     });
 
     it('blocks unauthorized module access with ForbiddenException', () => {
-      const req: any = {
-        user: { userId: 'usr-dev', tenantId: 'ten-1', role: 'DEVELOPER' },
+      const req = {
+        user: { id: 'usr-dev', email: 'dev@test.com', tenantId: 'ten-1', role: 'DEVELOPER' },
         originalUrl: '/billing/summary',
-      };
+      } as unknown as RequestWithPermissions;
+      const res = {} as Response;
       const next = jest.fn();
 
-      expect(() => middleware.use(req, {} as any, next)).toThrow(ForbiddenException);
+      expect(() => middleware.use(req, res, next)).toThrow(ForbiddenException);
       expect(next).not.toHaveBeenCalled();
     });
 
     it('allows authorized role access to module', () => {
-      const req: any = {
-        user: { userId: 'usr-fin', tenantId: 'ten-1', role: 'FINANCE' },
+      const req = {
+        user: { id: 'usr-fin', email: 'fin@test.com', tenantId: 'ten-1', role: 'FINANCE' },
         originalUrl: '/billing/summary',
-      };
+      } as unknown as RequestWithPermissions;
+      const res = {} as Response;
       const next = jest.fn();
 
-      middleware.use(req, {} as any, next);
+      middleware.use(req, res, next);
 
       expect(next).toHaveBeenCalled();
     });

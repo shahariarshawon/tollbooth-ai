@@ -42,7 +42,7 @@ export class BillingController {
   }
 
   @Get('plans')
-  listPlans(): Promise<any[]> {
+  listPlans() {
     return this.billing.listPlans();
   }
 
@@ -51,7 +51,7 @@ export class BillingController {
   createPlan(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateBillingPlanDto,
-  ): Promise<any> {
+  ) {
     return this.billing.createPlan(dto, actor.userId);
   }
 
@@ -61,7 +61,7 @@ export class BillingController {
     @CurrentTenantId() tenantId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: AssignSubscriptionDto,
-  ): Promise<any> {
+  ) {
     return this.billing.assignSubscription(tenantId, dto, actor.userId);
   }
 
@@ -71,7 +71,7 @@ export class BillingController {
     @CurrentTenantId() tenantId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: UpdateBillingLimitsDto,
-  ): Promise<any> {
+  ) {
     return this.billing.updateLimits(tenantId, dto, actor.userId);
   }
 }

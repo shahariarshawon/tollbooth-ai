@@ -33,7 +33,7 @@ function getActionBadgeVariant(action: string) {
     return 'default';
   }
   if (action.includes('UPDATE') || action.includes('CHANGE') || action.includes('ASSIGN')) {
-    return 'secondary';
+    return 'muted';
   }
   return 'outline';
 }

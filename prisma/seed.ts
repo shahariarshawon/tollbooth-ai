@@ -282,7 +282,7 @@ async function seedTenant() {
     },
   });
 
-  const marketingTeam = await prisma.team.upsert({
+  await prisma.team.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: 'Marketing Team' } },
     update: {},
     create: {

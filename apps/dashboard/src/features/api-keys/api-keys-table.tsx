@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Ban, RefreshCw, Users, Clock, Coins, Activity } from 'lucide-react';
+import { Ban, RefreshCw, Users, Clock, Coins } from 'lucide-react';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { RowActions } from '@/components/ui/row-actions';
 import {
@@ -49,7 +49,7 @@ export function ApiKeysTable({ keys, onRotate, onRevoke }: ApiKeysTableProps) {
         {keys.map((key) => {
           const revoked = key.status === 'REVOKED';
           const isExpired = key.expiresAt && new Date(key.expiresAt) < new Date();
-          const requests = key.totalRequests ?? 0;
+          const requests = key.totalRequests ?? key.requestsCount ?? 0;
           const tokens = key.totalTokens ?? 0;
           const cost = key.totalCost ?? 0;
 
@@ -73,7 +73,7 @@ export function ApiKeysTable({ keys, onRotate, onRevoke }: ApiKeysTableProps) {
               {/* Team */}
               <TableCell>
                 {key.teamName ? (
-                  <Badge variant="secondary" className="gap-1 text-xs">
+                  <Badge variant="outline" className="gap-1 text-xs">
                     <Users className="h-3 w-3 text-muted-foreground" />
                     {key.teamName}
                   </Badge>

@@ -27,7 +27,7 @@ export class SettingsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('category') category: string,
     @Body() value: Record<string, unknown>,
-  ): Promise<any> {
+  ) {
     return this.settingsService.updateSection(tenantId, category, value, actor.userId);
   }
 }

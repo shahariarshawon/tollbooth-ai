@@ -32,7 +32,7 @@ export class TeamsController {
     @CurrentTenantId() tenantId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateTeamDto,
-  ): Promise<any> {
+  ) {
     return this.teamsService.create(tenantId, dto, actor.userId);
   }
 
@@ -51,7 +51,7 @@ export class TeamsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateTeamDto,
-  ): Promise<any> {
+  ) {
     return this.teamsService.update(tenantId, id, dto, actor.userId);
   }
 

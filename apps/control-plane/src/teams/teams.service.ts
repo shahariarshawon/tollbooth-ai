@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -156,7 +155,7 @@ export class TeamsService {
     };
   }
 
-  async create(tenantId: string, dto: CreateTeamDto, actorUserId?: string): Promise<any> {
+  async create(tenantId: string, dto: CreateTeamDto, actorUserId?: string) {
     const existing = await this.prisma.team.findUnique({
       where: { tenantId_name: { tenantId, name: dto.name.trim() } },
     });
@@ -191,7 +190,7 @@ export class TeamsService {
     return team;
   }
 
-  async update(tenantId: string, id: string, dto: UpdateTeamDto, actorUserId?: string): Promise<any> {
+  async update(tenantId: string, id: string, dto: UpdateTeamDto, actorUserId?: string) {
     await this.getById(tenantId, id);
 
     if (dto.name) {

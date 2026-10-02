@@ -66,6 +66,7 @@ export interface Project {
   requestsCount?: number;
   totalTokens?: number;
   totalCost?: number;
+  currentSpendMonth?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -90,6 +91,7 @@ export interface ApiKey {
   createdAt: string;
   lastUsedAt: string | null;
   requestsCount?: number;
+  totalRequests?: number;
   totalTokens?: number;
   totalCost?: number;
 }
@@ -230,11 +232,17 @@ export interface NotificationSettings {
   alertEmail: string;
   budgetThresholds: number[];
   notifyOnKeyRevoke: boolean;
+  budgetAlertThresholdPercent?: number;
+  dailyDigestEnabled?: boolean;
 }
 
 export interface SystemSettings {
   maintenanceMode: boolean;
   featureFlags: Record<string, boolean>;
+  teamLimitsEnabled?: boolean;
+  streamingEnabled?: boolean;
+  piiMaskingEnabled?: boolean;
+  promptGuardEnabled?: boolean;
 }
 
 export interface AllSettings {

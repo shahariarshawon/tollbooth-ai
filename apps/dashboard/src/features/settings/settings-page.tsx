@@ -8,12 +8,10 @@ import {
   Bell,
   Cpu,
   Save,
-  CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
 import { Permission } from '@tollbooth/shared';
 import { QueryBoundary } from '@/components/query-boundary';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
@@ -392,7 +390,7 @@ function NotificationsTab({ data }: { data: NotificationSettings }) {
         </Field>
 
         <Field
-          label={`Budget Alert Threshold (${form.budgetAlertThresholdPercent}%)`}
+          label={`Budget Alert Threshold (${form.budgetAlertThresholdPercent ?? form.budgetThresholds?.[0] ?? 80}%)`}
           hint="Send notification when tenant monthly spending hits this percentage of monthly budget limit"
         >
           <div className="flex items-center gap-4">
@@ -401,14 +399,19 @@ function NotificationsTab({ data }: { data: NotificationSettings }) {
               min={50}
               max={100}
               step={5}
-              value={form.budgetAlertThresholdPercent}
-              onChange={(e) =>
-                setForm({ ...form, budgetAlertThresholdPercent: Number(e.target.value) })
-              }
+              value={form.budgetAlertThresholdPercent ?? form.budgetThresholds?.[0] ?? 80}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setForm({
+                  ...form,
+                  budgetAlertThresholdPercent: val,
+                  budgetThresholds: [val],
+                });
+              }}
               className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             />
             <span className="font-mono text-sm font-semibold w-12 text-right">
-              {form.budgetAlertThresholdPercent}%
+              {form.budgetAlertThresholdPercent ?? form.budgetThresholds?.[0] ?? 80}%
             </span>
           </div>
         </Field>
@@ -422,7 +425,7 @@ function NotificationsTab({ data }: { data: NotificationSettings }) {
           </div>
           <input
             type="checkbox"
-            checked={form.dailyDigestEnabled}
+            checked={form.dailyDigestEnabled ?? true}
             onChange={(e) => setForm({ ...form, dailyDigestEnabled: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
@@ -503,8 +506,14 @@ function SystemTab({ data }: { data: SystemSettings }) {
           </div>
           <input
             type="checkbox"
-            checked={form.teamLimitsEnabled}
-            onChange={(e) => setForm({ ...form, teamLimitsEnabled: e.target.checked })}
+            checked={form.teamLimitsEnabled ?? form.featureFlags?.['teamLimits'] ?? true}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                teamLimitsEnabled: e.target.checked,
+                featureFlags: { ...form.featureFlags, teamLimits: e.target.checked },
+              })
+            }
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
         </div>
@@ -518,8 +527,14 @@ function SystemTab({ data }: { data: SystemSettings }) {
           </div>
           <input
             type="checkbox"
-            checked={form.streamingEnabled}
-            onChange={(e) => setForm({ ...form, streamingEnabled: e.target.checked })}
+            checked={form.streamingEnabled ?? form.featureFlags?.['streamingEnabled'] ?? false}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                streamingEnabled: e.target.checked,
+                featureFlags: { ...form.featureFlags, streamingEnabled: e.target.checked },
+              })
+            }
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
         </div>
@@ -533,8 +548,14 @@ function SystemTab({ data }: { data: SystemSettings }) {
           </div>
           <input
             type="checkbox"
-            checked={form.piiMaskingEnabled}
-            onChange={(e) => setForm({ ...form, piiMaskingEnabled: e.target.checked })}
+            checked={form.piiMaskingEnabled ?? form.featureFlags?.['piiMasking'] ?? true}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                piiMaskingEnabled: e.target.checked,
+                featureFlags: { ...form.featureFlags, piiMasking: e.target.checked },
+              })
+            }
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
         </div>
@@ -548,8 +569,14 @@ function SystemTab({ data }: { data: SystemSettings }) {
           </div>
           <input
             type="checkbox"
-            checked={form.promptGuardEnabled}
-            onChange={(e) => setForm({ ...form, promptGuardEnabled: e.target.checked })}
+            checked={form.promptGuardEnabled ?? form.featureFlags?.['promptGuard'] ?? true}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                promptGuardEnabled: e.target.checked,
+                featureFlags: { ...form.featureFlags, promptGuard: e.target.checked },
+              })
+            }
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
         </div>
@@ -633,8 +660,8 @@ function SettingsContent() {
 export function SettingsPage() {
   return (
     <Can
-      perform={Permission.MANAGE_SETTINGS}
-      fallback={<AccessDenied message="You do not have permission to manage organization settings." />}
+      permission={Permission.MANAGE_SETTINGS}
+      fallback={<AccessDenied />}
     >
       <SettingsContent />
     </Can>

@@ -49,7 +49,7 @@ export function ProjectsTable({
         {projects.map((project) => {
           const archived = project.status === 'ARCHIVED';
           const budget = project.monthlyBudget ? Number(project.monthlyBudget) : null;
-          const currentCost = Number(project.currentSpendMonth ?? 0);
+          const currentCost = Number(project.totalCost ?? 0);
 
           return (
             <TableRow key={project.id}>
@@ -64,7 +64,7 @@ export function ProjectsTable({
               {/* Team */}
               <TableCell>
                 {project.team ? (
-                  <Badge variant="secondary" className="gap-1 text-xs">
+                  <Badge variant="outline" className="gap-1 text-xs">
                     <Users className="h-3 w-3 text-muted-foreground" />
                     {project.team.name}
                   </Badge>

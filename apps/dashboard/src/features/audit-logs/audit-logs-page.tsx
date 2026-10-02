@@ -3,10 +3,8 @@
 import * as React from 'react';
 import {
   Download,
-  Filter,
   Search,
   Shield,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -263,8 +261,8 @@ function AuditLogsContent() {
 export function AuditLogsPage() {
   return (
     <Can
-      perform={Permission.VIEW_AUDIT_LOGS}
-      fallback={<AccessDenied message="You do not have permission to view tenant audit logs." />}
+      permission={Permission.VIEW_AUDIT_LOGS}
+      fallback={<AccessDenied />}
     >
       <AuditLogsContent />
     </Can>

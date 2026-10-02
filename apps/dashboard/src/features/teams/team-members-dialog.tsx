@@ -1,14 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, Trash2, UserPlus } from 'lucide-react';
+import { Trash2, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
-import type { Team, TeamMemberRole } from '@/types/api';
+import type { TeamMemberRole } from '@/types/api';
 import { errorMessage } from '@/utils/errors';
 import { useTeam, useTeamMutations, useTenantUsers } from './hooks';
 

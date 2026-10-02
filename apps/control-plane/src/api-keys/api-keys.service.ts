@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -73,7 +72,7 @@ export class ApiKeysService {
     });
     if (!project) throw new NotFoundException('Project not found');
 
-    let teamId = dto.teamId ?? project.teamId;
+    const teamId = dto.teamId ?? project.teamId;
     if (teamId) {
       const team = await this.prisma.team.findFirst({ where: { id: teamId, tenantId } });
       if (!team) throw new NotFoundException('Team not found');

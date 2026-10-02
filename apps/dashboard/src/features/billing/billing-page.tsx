@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { CreditCard } from 'lucide-react';
 import { Permission } from '@tollbooth/shared';
 import { QueryBoundary } from '@/components/query-boundary';
 import { PageHeader } from '@/components/ui/page-header';

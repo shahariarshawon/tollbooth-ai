@@ -16,18 +16,22 @@ Label.displayName = 'Label';
 
 interface FieldProps {
   label: string;
-  htmlFor: string;
+  htmlFor?: string;
   error?: string | undefined;
   hint?: string;
+  required?: boolean;
   children: React.ReactNode;
   className?: string;
 }
 
 /** Label, control, hint and validation message laid out the same way in every form. */
-function Field({ label, htmlFor, error, hint, children, className }: FieldProps) {
+function Field({ label, htmlFor, error, hint, required, children, className }: FieldProps) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required && <span className="text-destructive ml-0.5" aria-hidden="true">*</span>}
+      </Label>
       {children}
       {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && (

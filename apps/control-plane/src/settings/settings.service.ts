@@ -27,6 +27,8 @@ const DEFAULT_SETTINGS = {
     alertEmail: '',
     budgetThresholds: [75, 90, 100],
     notifyOnKeyRevoke: true,
+    budgetAlertThresholdPercent: 80,
+    dailyDigestEnabled: true,
   },
   system: {
     maintenanceMode: false,
@@ -36,6 +38,10 @@ const DEFAULT_SETTINGS = {
       promptGuard: true,
       teamLimits: true,
     },
+    teamLimitsEnabled: true,
+    streamingEnabled: false,
+    piiMaskingEnabled: true,
+    promptGuardEnabled: true,
   },
 };
 

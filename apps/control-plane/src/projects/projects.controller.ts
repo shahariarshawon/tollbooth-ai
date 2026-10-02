@@ -32,7 +32,7 @@ export class ProjectsController {
     @CurrentTenantId() tenantId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateProjectDto,
-  ): Promise<any> {
+  ) {
     return this.projectsService.create(tenantId, dto, actor.userId);
   }
 
@@ -51,7 +51,7 @@ export class ProjectsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
-  ): Promise<any> {
+  ) {
     return this.projectsService.update(tenantId, id, dto, actor.userId);
   }
 

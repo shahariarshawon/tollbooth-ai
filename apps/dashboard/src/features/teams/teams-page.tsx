@@ -106,11 +106,12 @@ function TeamsContent() {
       {dialog?.type === 'delete' && (
         <ConfirmDialog
           open={true}
+          onOpenChange={(open) => !open && closeDialog()}
           title={`Delete ${dialog.team.name}?`}
           description="Are you sure you want to delete this team? Projects and API keys assigned to this team will have their team association cleared, but will not be deleted."
           confirmLabel={remove.isPending ? 'Deleting...' : 'Delete Team'}
           destructive
-          onClose={closeDialog}
+          loading={remove.isPending}
           onConfirm={() => handleDelete(dialog.team)}
         />
       )}
@@ -121,8 +122,8 @@ function TeamsContent() {
 export function TeamsPage() {
   return (
     <Can
-      perform={Permission.TEAM_READ}
-      fallback={<AccessDenied message="You do not have permission to view teams." />}
+      permission={Permission.TEAM_READ}
+      fallback={<AccessDenied />}
     >
       <TeamsContent />
     </Can>

@@ -26,7 +26,7 @@ const schema = z.object({
   name: z.string().trim().min(1, 'Project name is required').max(200),
   description: z.string().trim().max(1000, 'At most 1000 characters').optional().or(z.literal('')),
   teamId: z.string().optional().or(z.literal('')),
-  monthlyBudget: z.coerce.number().min(0).optional().nullable(),
+  monthlyBudget: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -141,7 +141,12 @@ export function ProjectFormDialog({
           type="number"
           step="1"
           placeholder="e.g. 500"
-          {...register('monthlyBudget')}
+          {...register('monthlyBudget', {
+            setValueAs: (v) =>
+              v === '' || v === null || v === undefined || Number.isNaN(Number(v))
+                ? null
+                : Number(v),
+          })}
         />
       </Field>
 

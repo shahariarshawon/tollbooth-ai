@@ -112,15 +112,22 @@ export class AnalyticsService {
       .sort((a, b) => b._count._all - a._count._all)
       .slice(0, 5);
 
+    const projectIds = topProjectGroups.map((group) => group.projectId).filter(Boolean);
+    const apiKeyIds = topApiKeyGroups.map((group) => group.apiKeyId).filter(Boolean);
+
     const [projects, apiKeys] = await Promise.all([
-      this.prisma.project.findMany({
-        where: { id: { in: topProjectGroups.map((group) => group.projectId) } },
-        select: { id: true, name: true },
-      }),
-      this.prisma.apiKey.findMany({
-        where: { id: { in: topApiKeyGroups.map((group) => group.apiKeyId) } },
-        select: { id: true, name: true, project: { select: { name: true } } },
-      }),
+      projectIds.length > 0
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      apiKeyIds.length > 0
+        ? this.prisma.apiKey.findMany({
+            where: { id: { in: apiKeyIds } },
+            select: { id: true, name: true, project: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
     ]);
     const projectName = new Map(projects.map((project) => [project.id, project.name]));
     const apiKeyInfo = new Map(apiKeys.map((key) => [key.id, key]));

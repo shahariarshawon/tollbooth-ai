@@ -9,7 +9,6 @@ import {
   Pencil,
   Trash2,
   UserPlus,
-  ShieldCheck,
   Zap,
   Coins,
 } from 'lucide-react';
@@ -58,8 +57,8 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
         </TableHeader>
         <TableBody>
           {teams.map((team) => {
-            const monthlyBudget = team.monthlyBudgetLimit ? Number(team.monthlyBudgetLimit) : null;
-            const currentSpend = Number(team.currentSpendMonth ?? 0);
+            const monthlyBudget = team.monthlyBudget ? Number(team.monthlyBudget) : null;
+            const currentSpend = Number(team.currentUsageCost ?? 0);
             const budgetPercent = monthlyBudget && monthlyBudget > 0
               ? Math.min(100, Math.round((currentSpend / monthlyBudget) * 100))
               : null;
@@ -91,16 +90,20 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                     title="Click to manage team members"
                   >
                     <div className="flex -space-x-2 overflow-hidden">
-                      {team.members.slice(0, 3).map((m) => (
-                        <Avatar
-                          key={m.id}
-                          className="inline-block h-7 w-7 ring-2 ring-background border border-border/40"
-                        >
-                          <AvatarFallback className="text-[10px] font-semibold uppercase bg-secondary text-secondary-foreground">
-                            {m.user.name?.slice(0, 2) || m.user.email.slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
+                      {team.members.slice(0, 3).map((m) => {
+                        const fullName = `${m.user.firstName ?? ''} ${m.user.lastName ?? ''}`.trim();
+                        const initials = fullName ? fullName.slice(0, 2) : m.user.email.slice(0, 2);
+                        return (
+                          <Avatar
+                            key={m.id}
+                            className="inline-block h-7 w-7 ring-2 ring-background border border-border/40"
+                          >
+                            <AvatarFallback className="text-[10px] font-semibold uppercase bg-secondary text-secondary-foreground">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                        );
+                      })}
                     </div>
                     <Badge variant="outline" className="text-xs font-normal group-hover:border-primary/60">
                       <Users className="h-3 w-3 mr-1 text-muted-foreground" />
@@ -114,10 +117,10 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                   <div className="space-y-0.5 text-xs">
                     <div className="flex items-center gap-1.5 text-foreground">
                       <Zap className="h-3 w-3 text-amber-500 shrink-0" />
-                      <span>{team.rpmLimit ? `${team.rpmLimit.toLocaleString()} RPM` : '∞ RPM'}</span>
+                      <span>{team.rateLimitRpm ? `${team.rateLimitRpm.toLocaleString()} RPM` : '∞ RPM'}</span>
                     </div>
                     <div className="text-muted-foreground pl-4.5">
-                      {team.rpdLimit ? `${team.rpdLimit.toLocaleString()} RPD` : 'Unlimited / day'}
+                      {team.rateLimitRpd ? `${team.rateLimitRpd.toLocaleString()} RPD` : 'Unlimited / day'}
                     </div>
                   </div>
                 </TableCell>
@@ -126,10 +129,10 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                 <TableCell>
                   <div className="space-y-0.5 text-xs">
                     <div className="text-foreground font-medium">
-                      {team.tpmLimit ? `${(team.tpmLimit / 1000).toLocaleString()}k TPM` : '∞ TPM'}
+                      {team.tokenLimitTpm ? `${(team.tokenLimitTpm / 1000).toLocaleString()}k TPM` : '∞ TPM'}
                     </div>
                     <div className="text-muted-foreground">
-                      {team.tpdLimit ? `${(team.tpdLimit / 1_000_000).toFixed(1)}M TPD` : 'Unlimited tokens'}
+                      {team.tokenLimitTpd ? `${(team.tokenLimitTpd / 1_000_000).toFixed(1)}M TPD` : 'Unlimited tokens'}
                     </div>
                   </div>
                 </TableCell>
@@ -160,9 +163,9 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                         />
                       </div>
                     )}
-                    {team.dailyBudgetLimit && (
+                    {team.dailyBudget && (
                       <div className="text-[10px] text-muted-foreground">
-                        Daily cap: ${Number(team.dailyBudgetLimit).toFixed(2)}
+                        Daily cap: ${Number(team.dailyBudget).toFixed(2)}
                       </div>
                     )}
                   </div>
@@ -175,7 +178,7 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                       team.allowedModels.slice(0, 2).map((m) => (
                         <Badge
                           key={m}
-                          variant="secondary"
+                          variant="outline"
                           className="text-[10px] font-mono px-1.5 py-0 bg-primary/10 text-primary border-primary/20"
                         >
                           {m.replace(/^models\//, '')}
@@ -199,11 +202,11 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1" title="Projects in team">
                       <FolderGit2 className="h-3.5 w-3.5 text-muted-foreground/80" />
-                      {team._count?.projects ?? team.projects?.length ?? 0}
+                      {team.projectsCount ?? 0}
                     </span>
                     <span className="flex items-center gap-1" title="API Keys assigned">
                       <KeyRound className="h-3.5 w-3.5 text-muted-foreground/80" />
-                      {team._count?.apiKeys ?? team.apiKeys?.length ?? 0}
+                      {team.apiKeysCount ?? 0}
                     </span>
                   </div>
                 </TableCell>
