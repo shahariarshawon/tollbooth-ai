@@ -115,7 +115,10 @@ export function ProjectFormDialog({
         />
       </Field>
 
-      <Field label="Assigned Team" hint="Assign to an organizational team for budget tracking and limits">
+      <Field
+        label="Assigned Team"
+        hint="Assign to an organizational team for budget tracking and limits"
+      >
         <select
           id="teamId"
           {...register('teamId')}

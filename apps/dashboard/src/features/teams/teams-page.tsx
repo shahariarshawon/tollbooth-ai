@@ -7,6 +7,7 @@ import { QueryBoundary } from '@/components/query-boundary';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/modal';
+import { Notice } from '@/components/ui/notice';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState, TableSkeleton } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
@@ -51,7 +52,7 @@ function TeamsContent() {
     <>
       <PageHeader
         title="Teams & Limit Control"
-        description="Organize workspaces into teams with granular request & token limits, monthly budgets, and model permissions."
+        description="Organize projects and API keys into teams, with limits and model permissions."
         actions={
           canManage && (
             <Button onClick={() => setDialog({ type: 'form' })} className="gap-2">
@@ -60,6 +61,10 @@ function TeamsContent() {
           )
         }
       />
+      <Notice>
+        Enforced by the gateway today: the model allow-list, and a team's requests-per-minute as the
+        default for its API keys. The daily, token and budget limits are saved but not applied yet.
+      </Notice>
 
       <Card className="p-0 overflow-hidden border-border/70">
         <QueryBoundary
@@ -70,7 +75,7 @@ function TeamsContent() {
             <EmptyState
               icon={Users2}
               title="No teams configured"
-              description="Create teams like Engineering, Marketing, or Research to enforce budgets and model access."
+              description="Create teams like Engineering, Marketing, or Research to group projects and keys and set which models they may use."
               action={
                 canManage && (
                   <Button onClick={() => setDialog({ type: 'form' })} className="mt-4 gap-2">
@@ -93,9 +98,7 @@ function TeamsContent() {
       </Card>
 
       {/* Create / Edit Form Modal */}
-      {dialog?.type === 'form' && (
-        <TeamFormDialog team={dialog.team} onClose={closeDialog} />
-      )}
+      {dialog?.type === 'form' && <TeamFormDialog team={dialog.team} onClose={closeDialog} />}
 
       {/* Member Management Modal */}
       {dialog?.type === 'members' && (
@@ -121,10 +124,7 @@ function TeamsContent() {
 
 export function TeamsPage() {
   return (
-    <Can
-      permission={Permission.TEAM_READ}
-      fallback={<AccessDenied />}
-    >
+    <Can permission={Permission.TEAM_READ} fallback={<AccessDenied />}>
       <TeamsContent />
     </Can>
   );

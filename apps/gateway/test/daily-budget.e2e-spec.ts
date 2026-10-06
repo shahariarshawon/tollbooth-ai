@@ -7,6 +7,7 @@ import {
   destroyTestContext,
   http,
   resetTrafficState,
+  setModelPrices,
   setProvider,
 } from './support/context';
 import type { Fixture, TestContext } from './support/context';
@@ -17,8 +18,9 @@ import type { Fixture, TestContext } from './support/context';
  *
  * `max_tokens` is set explicitly on every request here so the pre-call worst-case reservation
  * (input tokens + max_tokens, see budget/cost-estimator.ts `worstCaseMicroUsd`) matches what the fake
- * actually returns (7 output tokens): at gemini-2.0-flash's seeded paid-tier prices, 11 input + 7 output
- * tokens costs exactly 5 micro-dollars, which is also the daily cap below.
+ * actually returns (7 output tokens): at gemini-2.0-flash's paid-tier prices (pinned below, $0.10 and
+ * $0.40 per million tokens), 11 input + 7 output tokens costs exactly 5 micro-dollars, which is also
+ * the daily cap below.
  */
 describe('Daily budget (e2e)', () => {
   let ctx: TestContext;
@@ -36,6 +38,7 @@ describe('Daily budget (e2e)', () => {
     });
     fixture = await createFixture(ctx, 'STARTUP');
     await setProvider(ctx, 'Google Gemini', { status: 'ACTIVE', tier: 'paid' });
+    await setModelPrices(ctx, 'gemini-2.0-flash', { input: '0.10', output: '0.40' });
   });
   afterAll(async () => {
     if (ctx) await destroyTestContext(ctx);

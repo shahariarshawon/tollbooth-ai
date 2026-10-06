@@ -8,11 +8,14 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
 import { BillingModule } from './billing/billing.module';
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
+import { DemoPolicyGuard } from './common/guards/demo-policy.guard';
 import { TenantContextGuard } from './common/guards/tenant-context.guard';
 import { ConfigModule } from './config/config.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthController } from './health.controller';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { ProjectsModule } from './projects/projects.module';
 import { PermissionMiddleware } from './roles/permission.middleware';
 import { RolesGuard } from './roles/roles.guard';
@@ -26,12 +29,14 @@ import { UsersModule } from './users/users.module';
   imports: [
     ConfigModule,
     PrismaModule,
+    RedisModule,
     AuditModule,
     RolesModule,
     AuthModule,
     UsersModule,
     TenantsModule,
     AnalyticsModule,
+    DashboardModule,
     AlertModule,
     BillingModule,
     TeamsModule,
@@ -41,10 +46,12 @@ import { UsersModule } from './users/users.module';
   ],
   controllers: [HealthController, AppController],
   providers: [
-    // Global guards run in this order: authenticate, resolve tenant, check permissions.
+    // Global guards run in this order: authenticate, resolve tenant, check permissions, apply the
+    // demo workspace's read-only policy.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantContextGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: DemoPolicyGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     {
       provide: APP_PIPE,
@@ -61,4 +68,3 @@ export class AppModule implements NestModule {
     consumer.apply(PermissionMiddleware).forRoutes('*');
   }
 }
-

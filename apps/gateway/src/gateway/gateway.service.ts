@@ -68,10 +68,11 @@ export class GatewayService {
 
     const allowed = context.auth.allowedModels;
     if (allowed && allowed.length > 0) {
-      const match = allowed.some((m) =>
-        dto.model.toLowerCase() === m.toLowerCase() ||
-        dto.model.toLowerCase().includes(m.toLowerCase()) ||
-        m.toLowerCase().includes(dto.model.toLowerCase())
+      const match = allowed.some(
+        (m) =>
+          dto.model.toLowerCase() === m.toLowerCase() ||
+          dto.model.toLowerCase().includes(m.toLowerCase()) ||
+          m.toLowerCase().includes(dto.model.toLowerCase()),
       );
       if (!match) {
         throw GatewayErrors.invalidRequest(

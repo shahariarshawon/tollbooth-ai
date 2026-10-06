@@ -82,13 +82,12 @@ and embeddings. The Gateway calls it over HTTP.
 ### PostgreSQL (`prisma/`)
 
 System of record: tenants, users, keys, budgets, policies and aggregated usage. Accessed through
-Prisma. `pgvector` is enabled for embedding storage.
+Prisma. The `vector` extension is enabled, but no feature uses it yet.
 
 ### Redis
 
-Low-latency shared state: API key lookup cache, rate-limit windows and real-time budget counters.
-It also backs BullMQ queues. Most of this data can be rebuilt from Postgres, except in-flight
-counters.
+Low-latency shared state: rate-limit windows, real-time budget counters and the provider circuit
+breaker's state. Most of this data can be rebuilt from Postgres, except in-flight counters.
 
 ### Kafka
 
@@ -98,30 +97,26 @@ tenant ID to keep per-tenant ordering.
 
 ### Workers (`apps/worker`)
 
-Kafka consumers and BullMQ job processors: persist usage, roll up analytics, send budget alerts and
-run scheduled jobs. They scale independently of request traffic.
+Kafka consumers. Today the worker subscribes to the usage and provider-failure topics and logs what it
+receives; it does no other work yet. Usage itself is written to PostgreSQL by the gateway, not by the
+worker.
 
 ### Dashboard (`apps/dashboard`)
 
 Next.js UI for three personas: admins (tenants, budgets, permissions), developers (keys, usage) and
-finance (cost by team and model). It talks only to the Control plane.
+finance (cost by team and model), plus a static public landing page. Its server-side routes (`/api/auth/*`,
+`/api/cp/*`) are a backend-for-frontend: they hold the session in httpOnly cookies and are the only client of
+the control plane, which is not reachable from the public edge.
 
 ### Observability
 
-Services emit OpenTelemetry traces and Prometheus metrics. Grafana visualises them.
-
-## Kafka vs BullMQ
-
-| Concern                      | Kafka                             | BullMQ (Redis)                  |
-| ---------------------------- | --------------------------------- | ------------------------------- |
-| Usage and audit events       | Yes: durable, replayable, fan-out | No                              |
-| Delayed or retried jobs      | No                                | Yes: per-job retry, delay, cron |
-| Multiple independent readers | Yes (consumer groups)             | No (one consumer takes a job)   |
+The gateway writes structured logs with a request id and exposes Prometheus metrics, which Grafana
+visualises. There is no distributed tracing, and the control plane exposes no metrics.
 
 ## Key decisions
 
 - **Monorepo with pnpm workspaces**: one place for shared types and config, and atomic cross-service changes.
 - **Gateway and control plane split**: isolates the latency-critical path from admin workloads.
-- **Kafka for events, BullMQ for jobs**: each is used for what it is good at.
+- **Kafka for events**: durable, replayable, and readable by independent consumers. No job queue is used.
 - **KRaft-mode Kafka locally**: no Zookeeper to run or maintain.
 - **Env validation in `@tollbooth/config`**: misconfiguration fails at startup.

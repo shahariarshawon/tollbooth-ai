@@ -221,8 +221,8 @@ Decisions:
   workers from Kafka, so dashboards never scan raw requests. Redis holds real-time budget counters.
 - **Read replicas** for analytics and dashboards.
 - **Connection pooling** (PgBouncer) once several services and workers connect.
-- **pgvector**: the `vector` extension is enabled by the initial migration. Embedding tables
-  (semantic policy matching, prompt similarity) arrive with the AI features, using HNSW indexes.
+- **pgvector**: the `vector` extension is enabled by the initial migration, and nothing uses it yet. A
+  similarity feature would add embedding tables with HNSW indexes; until then it is only a prepared option.
 - **RBAC**: replace or supplement `users.role` with `roles` and `permissions` tables when
   finer-grained control is needed.
 - **Budgets and model permissions** are not modelled yet. They appear in the audit examples
@@ -231,23 +231,31 @@ Decisions:
 
 ## Migrations and local workflow
 
-| Command            | Purpose                                                       |
-| ------------------ | ------------------------------------------------------------- |
-| `pnpm db:migrate`  | Create and apply a migration in development                   |
-| `pnpm db:deploy`   | Apply existing migrations (CI, staging, production)           |
-| `pnpm db:seed`     | Insert idempotent development data                            |
-| `pnpm db:reset`    | Drop the database, re-apply migrations, re-seed (destructive) |
-| `pnpm db:studio`   | Browse data in Prisma Studio                                  |
-| `pnpm db:generate` | Regenerate the Prisma client                                  |
+| Command                  | Purpose                                                       |
+| ------------------------ | ------------------------------------------------------------- |
+| `pnpm db:migrate`        | Create and apply a migration in development                   |
+| `pnpm db:deploy`         | Apply existing migrations (CI, staging, production)           |
+| `pnpm db:seed`           | Seed reference data and the development tenant (local only)   |
+| `pnpm db:seed:reference` | Seed providers, models and billing plans (production-safe)    |
+| `pnpm db:seed:demo`      | Seed reference data and the public demo workspace             |
+| `pnpm db:reset`          | Drop the database, re-apply migrations, re-seed (destructive) |
+| `pnpm db:studio`         | Browse data in Prisma Studio                                  |
+| `pnpm db:generate`       | Regenerate the Prisma client                                  |
 
-The initial migration is `001_initial_database_schema`. It ends with a hand-written section of
+Migrations are applied with `prisma migrate deploy` (see [deployment](../deployment.md)); CI fails if they
+produce a schema different from `schema.prisma`. The initial migration is `001_initial_database_schema`. It ends with a hand-written section of
 CHECK constraints that Prisma cannot express; keep any future ones in migrations too. Migration
 history is the only place extensions are created, so no init script runs in the Postgres container.
 
 ### Seed data
 
-Tenant `techcorp-ai` (TechCorp AI, Startup plan), users `admin@techcorp.com` (tenant admin) and
-`developer@techcorp.com`, both with the development password `ChangeMe123!`, project
-`Customer Support AI`, providers Google Gemini (ACTIVE, free tier), OpenAI and Anthropic (both DISABLED), Gemini models plus `gpt-4o` and
-`claude-sonnet-4-5`, and one generated API key. The raw key is printed once when first seeded and
-only its hash is stored. Seed passwords use `scrypt`; the authentication phase may rehash at first login.
+Seeds are split by where they may run (`prisma/seed/`):
+
+- `reference`: the provider and model catalogue (Gemini active and on the free tier; OpenAI and Anthropic
+  disabled) and four billing plans. Only creates what is missing and never overwrites, so it is safe in
+  production and when repeated. It creates no users.
+- `dev`: tenant `techcorp-ai` with one user per role, three teams, a project and a development API key whose
+  raw value is printed once. All users share the documented password `ChangeMe123!`, so it refuses to run with
+  `NODE_ENV=production`.
+- `demo`: the public demo workspace (see [ADR 0007](../adr/0007-public-demo-architecture.md)). Users have an
+  unusable password; traffic is generated; it touches only the tenant flagged `isDemo`.

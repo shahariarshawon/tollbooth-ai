@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import { Permission } from '@tollbooth/shared';
 import type { UserRole } from '@tollbooth/shared';
 import { AppSidebar } from './app-sidebar';
+import { NAV_ITEMS } from './nav-items';
 
 let role: UserRole = 'DEVELOPER';
 let pathname = '/dashboard';
@@ -86,5 +88,10 @@ describe('AppSidebar permissions', () => {
     render(<AppSidebar />);
     expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('opens the API keys page on the read permission, so a user who cannot create keys can still see them', () => {
+    const item = NAV_ITEMS.find((candidate) => candidate.href === '/dashboard/api-keys');
+    expect(item?.permission).toBe(Permission.API_KEY_READ);
   });
 });

@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { CurrentTenantId, CurrentUser } from '../common/decorators/request.decorators';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
 import { Permission } from '../roles/permission';
@@ -48,10 +41,7 @@ export class BillingController {
 
   @Post('plans')
   @RequirePermission(Permission.MANAGE_BILLING)
-  createPlan(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Body() dto: CreateBillingPlanDto,
-  ) {
+  createPlan(@CurrentUser() actor: AuthenticatedUser, @Body() dto: CreateBillingPlanDto) {
     return this.billing.createPlan(dto, actor.userId);
   }
 

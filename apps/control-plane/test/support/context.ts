@@ -1,11 +1,14 @@
 import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import { loadControlPlaneConfig } from '@tollbooth/config';
 import { PrismaService } from '@tollbooth/database';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { APP_CONFIG } from '../../src/config/config.module';
+import type { AppConfig } from '../../src/config/config.module';
 import { InMemoryRateLimitStore } from '../../src/common/rate-limit/in-memory-rate-limit.store';
 import { RATE_LIMIT_STORE } from '../../src/common/rate-limit/rate-limit.store';
 
@@ -28,13 +31,19 @@ export interface Account {
   refreshToken: string;
 }
 
-/** Boots the real application against the real database. Only Redis is replaced by an in-memory store. */
-export async function createTestContext(): Promise<TestContext> {
+/**
+ * Boots the real application against the real database. Only the rate limiter's Redis is replaced by an
+ * in-memory store. `config` overrides settings of the validated environment for this app instance only.
+ */
+export async function createTestContext(config: Partial<AppConfig> = {}): Promise<TestContext> {
   const store = new InMemoryRateLimitStore();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(RATE_LIMIT_STORE)
-    .useValue(store)
-    .compile();
+    .useValue(store);
+  if (Object.keys(config).length > 0) {
+    builder.overrideProvider(APP_CONFIG).useValue({ ...loadControlPlaneConfig(), ...config });
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication();
   await app.init();
   return {

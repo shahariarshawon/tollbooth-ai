@@ -1,5 +1,5 @@
 import type { AppConfig } from '../config/config.module';
-import { RedisConfigService, resolveRedisSettings } from './redis.config';
+import { RedisConfigService } from './redis.config';
 
 const base = {
   REDIS_URL: 'redis://localhost:6379',
@@ -8,61 +8,6 @@ const base = {
 } as const;
 
 const env = (overrides: Partial<AppConfig> = {}) => ({ ...base, ...overrides }) as AppConfig;
-
-describe('resolveRedisSettings', () => {
-  it('reads host and port from REDIS_URL', () => {
-    expect(resolveRedisSettings(env({ REDIS_URL: 'redis://cache.internal:6380' }))).toMatchObject({
-      host: 'cache.internal',
-      port: 6380,
-      db: 0,
-      tls: false,
-    });
-  });
-
-  it('defaults the port and understands credentials, database and TLS in the URL', () => {
-    const settings = resolveRedisSettings(
-      env({ REDIS_URL: 'rediss://app:p%40ss%2Fword@cache.example.com/3' }),
-    );
-    expect(settings).toMatchObject({
-      host: 'cache.example.com',
-      port: 6379,
-      username: 'app',
-      password: 'p@ss/word',
-      db: 3,
-      tls: true,
-    });
-  });
-
-  it('prefers REDIS_HOST, REDIS_PORT and REDIS_PASSWORD when REDIS_HOST is set', () => {
-    const settings = resolveRedisSettings(
-      env({
-        REDIS_URL: 'redis://ignored:1111',
-        REDIS_HOST: 'redis.prod',
-        REDIS_PORT: 6390,
-        REDIS_PASSWORD: 'secret',
-        REDIS_TLS: true,
-      }),
-    );
-    expect(settings).toEqual({
-      host: 'redis.prod',
-      port: 6390,
-      password: 'secret',
-      tls: true,
-      db: 0,
-      commandTimeoutMs: 1000,
-    });
-  });
-
-  it('defaults the port to 6379 in host mode and omits an absent password', () => {
-    const settings = resolveRedisSettings(env({ REDIS_HOST: 'redis.prod' }));
-    expect(settings.port).toBe(6379);
-    expect('password' in settings).toBe(false);
-  });
-
-  it('carries the command timeout through', () => {
-    expect(resolveRedisSettings(env({ REDIS_COMMAND_TIMEOUT_MS: 250 })).commandTimeoutMs).toBe(250);
-  });
-});
 
 describe('RedisConfigService', () => {
   const service = new RedisConfigService(

@@ -1,7 +1,6 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import Redis, { type RedisOptions } from 'ioredis';
-import { APP_CONFIG } from '../../config/config.module';
-import type { AppConfig } from '../../config/config.module';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from '../../redis/redis.module';
 import type { RateLimitHit, RateLimitStore } from './rate-limit.store';
 import { InMemoryRateLimitStore } from './in-memory-rate-limit.store';
 
@@ -14,35 +13,11 @@ return { count, redis.call('TTL', KEYS[1]) }
 `;
 
 @Injectable()
-export class RedisRateLimitStore implements RateLimitStore, OnModuleDestroy {
+export class RedisRateLimitStore implements RateLimitStore {
   private readonly logger = new Logger(RedisRateLimitStore.name);
-  private readonly redis: Redis;
   private readonly memoryFallback = new InMemoryRateLimitStore();
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
-    let url = config.REDIS_URL;
-    const isUpstash = url.includes('upstash.io');
-    const useTls = config.REDIS_TLS || isUpstash || url.startsWith('rediss://');
-
-    if (useTls && url.startsWith('redis://')) {
-      url = url.replace('redis://', 'rediss://');
-    }
-
-    const options: RedisOptions = {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-      connectTimeout: 5000,
-      commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS ?? 1000,
-      ...(useTls ? { tls: {} } : {}),
-    };
-
-    // Fail fast instead of queueing commands while Redis is down: callers fail closed.
-    this.redis = new Redis(url, options);
-    // Connection errors surface on each command; this only stops unhandled-event noise.
-    this.redis.on('error', (err) => {
-      this.logger.warn(`Redis connection error: ${err.message}. Using fallback in-memory rate limiting.`);
-    });
-  }
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
   async hit(key: string, windowSeconds: number): Promise<RateLimitHit> {
     try {
@@ -57,9 +32,5 @@ export class RedisRateLimitStore implements RateLimitStore, OnModuleDestroy {
       );
       return this.memoryFallback.hit(key, windowSeconds);
     }
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    this.redis.disconnect();
   }
 }

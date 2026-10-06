@@ -1,3 +1,5 @@
+import { circuitKey } from '@tollbooth/shared';
+
 /** How long startup waits for Redis before carrying on (the client keeps reconnecting in the background). */
 export const REDIS_STARTUP_WAIT_MS = 3000;
 
@@ -57,5 +59,5 @@ export const RedisKeys = {
     `tenant:{${tenantId}}:apikey:${apiKeyId}:tokens:${minute}`,
   budget: (tenantId: string, month: string) => `tenant:{${tenantId}}:budget:${month}`,
   dailyBudget: (tenantId: string, day: string) => `tenant:{${tenantId}}:budget:daily:${day}`,
-  circuit: (provider: string) => `provider:${provider.toLowerCase()}:circuit`,
+  circuit: circuitKey,
 };

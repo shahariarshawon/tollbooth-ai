@@ -37,10 +37,7 @@ export class TeamsController {
   }
 
   @Get(':id')
-  getById(
-    @CurrentTenantId() tenantId: string,
-    @Param('id') id: string,
-  ) {
+  getById(@CurrentTenantId() tenantId: string, @Param('id') id: string) {
     return this.teamsService.getById(tenantId, id);
   }
 

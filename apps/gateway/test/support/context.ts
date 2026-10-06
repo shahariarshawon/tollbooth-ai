@@ -41,6 +41,8 @@ export interface TestContext {
   providerIds: string[];
   /** Provider rows as they were before the suite changed them, put back at the end. */
   providerSnapshots: { id: string; status: 'ACTIVE' | 'DISABLED'; configuration: object }[];
+  /** Model prices as they were before a suite pinned them with setModelPrices, put back at the end. */
+  modelPriceSnapshots: { id: string; inputTokenPrice: string; outputTokenPrice: string }[];
 }
 
 export interface Fixture {
@@ -135,6 +137,7 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
     modelIds: [],
     providerIds: [],
     providerSnapshots: [],
+    modelPriceSnapshots: [],
   };
   await ensureCatalogue(context);
   return context;
@@ -142,6 +145,28 @@ export async function createTestContext(options: ContextOptions = {}): Promise<T
 
 export function http(context: TestContext) {
   return request(context.app.getHttpServer());
+}
+
+/**
+ * Pins the USD-per-million-token prices of a model, so a test that asserts exact costs does not depend
+ * on whichever prices the database happens to hold (the development seed's, or the suite's defaults).
+ * Restored by destroyTestContext.
+ */
+export async function setModelPrices(
+  context: TestContext,
+  modelName: string,
+  prices: { input: string; output: string },
+): Promise<void> {
+  const model = await context.prisma.aiModel.findFirstOrThrow({ where: { modelName } });
+  context.modelPriceSnapshots.push({
+    id: model.id,
+    inputTokenPrice: model.inputTokenPrice.toString(),
+    outputTokenPrice: model.outputTokenPrice.toString(),
+  });
+  await context.prisma.aiModel.update({
+    where: { id: model.id },
+    data: { inputTokenPrice: prices.input, outputTokenPrice: prices.output },
+  });
 }
 
 const unique = (prefix: string): string => `${prefix}-${randomUUID().slice(0, 8)}`;
@@ -345,6 +370,15 @@ export async function destroyTestContext(context: TestContext): Promise<void> {
     await prisma.aiProvider.update({
       where: { id: snapshot.id },
       data: { status: snapshot.status, configuration: snapshot.configuration },
+    });
+  }
+  for (const snapshot of context.modelPriceSnapshots) {
+    await prisma.aiModel.update({
+      where: { id: snapshot.id },
+      data: {
+        inputTokenPrice: snapshot.inputTokenPrice,
+        outputTokenPrice: snapshot.outputTokenPrice,
+      },
     });
   }
   await context.app.close();

@@ -2,7 +2,6 @@ import axios, { AxiosError } from 'axios';
 import type { AxiosInstance } from 'axios';
 import { getTenantScope } from '@/lib/tenant-scope';
 import { ApiError } from './api-error';
-import { mockAdapter, shouldMock } from './mock/mock-adapter';
 
 type ErrorBody = { message?: string | string[] };
 
@@ -35,9 +34,6 @@ function createHttp(baseURL: string, options: { scoped: boolean }): AxiosInstanc
     baseURL,
     withCredentials: true,
     headers: { 'Content-Type': 'application/json' },
-    adapter: options.scoped
-      ? (config) => (shouldMock(config) ? mockAdapter(config) : defaultAdapter(config))
-      : undefined,
   });
 
   if (options.scoped) {
@@ -59,8 +55,6 @@ function createHttp(baseURL: string, options: { scoped: boolean }): AxiosInstanc
   );
   return instance;
 }
-
-const defaultAdapter = axios.getAdapter(axios.defaults.adapter);
 
 /**
  * Talks to the control plane through the dashboard's own `/api/cp` proxy. The browser never sees a

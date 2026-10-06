@@ -6,9 +6,11 @@ const passRes = { status: jest.fn().mockReturnThis() } as unknown as Response;
 
 function build(dbOk = true) {
   const prisma = {
-    $queryRaw: jest.fn().mockImplementation(() =>
-      dbOk ? Promise.resolve([{ '?column?': 1 }]) : Promise.reject(new Error('db down')),
-    ),
+    $queryRaw: jest
+      .fn()
+      .mockImplementation(() =>
+        dbOk ? Promise.resolve([{ '?column?': 1 }]) : Promise.reject(new Error('db down')),
+      ),
   } as unknown as PrismaService;
   return new HealthController(prisma);
 }

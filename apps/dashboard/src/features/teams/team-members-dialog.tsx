@@ -5,7 +5,13 @@ import { Trash2, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import type { TeamMemberRole } from '@/types/api';
@@ -105,12 +111,7 @@ export function TeamMembersDialog({ teamId, onClose }: TeamMembersDialogProps) {
             </Field>
           </div>
 
-          <Button
-            type="submit"
-            size="sm"
-            loading={addMember.isPending}
-            disabled={!selectedUserId}
-          >
+          <Button type="submit" size="sm" loading={addMember.isPending} disabled={!selectedUserId}>
             <UserPlus className="size-3.5 mr-1" /> Add
           </Button>
         </form>
@@ -144,7 +145,10 @@ export function TeamMembersDialog({ teamId, onClose }: TeamMembersDialogProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Badge variant={member.role === 'LEAD' ? 'default' : 'outline'} className="text-[10px]">
+                  <Badge
+                    variant={member.role === 'LEAD' ? 'default' : 'outline'}
+                    className="text-[10px]"
+                  >
                     {member.role}
                   </Badge>
                   <button

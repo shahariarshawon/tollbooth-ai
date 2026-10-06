@@ -1,21 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Building2,
-  Shield,
-  Bot,
-  Bell,
-  Cpu,
-  Save,
-  AlertTriangle,
-} from 'lucide-react';
+import { Building2, Shield, Bot, Bell, Cpu, Save, AlertTriangle } from 'lucide-react';
 import { Permission } from '@tollbooth/shared';
 import { QueryBoundary } from '@/components/query-boundary';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Notice } from '@/components/ui/notice';
 import { PageHeader } from '@/components/ui/page-header';
 import { TableSkeleton } from '@/components/ui/states';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -168,7 +161,10 @@ function SecurityTab({ data }: { data: SecuritySettings }) {
           </p>
         </div>
 
-        <Field label="Session Timeout (Minutes)" hint="Inactivity timeout before re-authentication is required">
+        <Field
+          label="Session Timeout (Minutes)"
+          hint="Inactivity timeout before re-authentication is required"
+        >
           <Input
             type="number"
             min={5}
@@ -203,7 +199,10 @@ function SecurityTab({ data }: { data: SecuritySettings }) {
           />
         </div>
 
-        <Field label="Default API Key Expiry (Days)" hint="Set to 0 for keys without automatic expiration">
+        <Field
+          label="Default API Key Expiry (Days)"
+          hint="Set to 0 for keys without automatic expiration"
+        >
           <Input
             type="number"
             min={0}
@@ -257,7 +256,9 @@ function AiTab({ data }: { data: AiSettings }) {
     <Card className="p-6 border-border/70 max-w-3xl">
       <form onSubmit={handleSave} className="space-y-5">
         <div>
-          <h3 className="text-base font-semibold text-foreground">AI Governance & Gateway Defaults</h3>
+          <h3 className="text-base font-semibold text-foreground">
+            AI Governance & Gateway Defaults
+          </h3>
           <p className="text-xs text-muted-foreground">
             Control allowed LLM providers, model access whitelists, and maximum token ceilings.
           </p>
@@ -361,7 +362,8 @@ function NotificationsTab({ data }: { data: NotificationSettings }) {
         <div>
           <h3 className="text-base font-semibold text-foreground">Alerts & Email Notifications</h3>
           <p className="text-xs text-muted-foreground">
-            Configure automated email notifications for budget threshold crossings and system notices.
+            Configure automated email notifications for budget threshold crossings and system
+            notices.
           </p>
         </div>
 
@@ -466,7 +468,9 @@ function SystemTab({ data }: { data: SystemSettings }) {
     <Card className="p-6 border-border/70 max-w-3xl">
       <form onSubmit={handleSave} className="space-y-5">
         <div>
-          <h3 className="text-base font-semibold text-foreground">System Governance & Feature Flags</h3>
+          <h3 className="text-base font-semibold text-foreground">
+            System Governance & Feature Flags
+          </h3>
           <p className="text-xs text-muted-foreground">
             Activate global safety guardrails, streaming, and tenant-level maintenance mode.
           </p>
@@ -476,8 +480,8 @@ function SystemTab({ data }: { data: SystemSettings }) {
           <div className="flex items-center gap-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
             <AlertTriangle className="h-5 w-5 shrink-0" />
             <div>
-              <span className="font-semibold">Maintenance Mode Active:</span> Non-admin requests to the AI
-              gateway will be blocked with a 503 Service Unavailable status.
+              <span className="font-semibold">Maintenance Mode Active:</span> Non-admin requests to
+              the AI gateway will be blocked with a 503 Service Unavailable status.
             </div>
           </div>
         )}
@@ -543,7 +547,8 @@ function SystemTab({ data }: { data: SystemSettings }) {
           <div>
             <div className="text-sm font-medium text-foreground">Automatic PII Masking</div>
             <div className="text-xs text-muted-foreground">
-              Sanitize SSNs, credit card numbers, and emails from prompts before forwarding to LLM providers.
+              Sanitize SSNs, credit card numbers, and emails from prompts before forwarding to LLM
+              providers.
             </div>
           </div>
           <input
@@ -599,13 +604,15 @@ function SettingsContent() {
     <div className="space-y-6">
       <PageHeader
         title="Settings & System Governance"
-        description="Configure organization identity, security rules, AI provider defaults, notification alerts, and gateway feature flags."
+        description="Organization profile and the preferences stored for this tenant."
       />
+      <Notice>
+        These values are saved for your tenant, but the gateway does not read them yet, so changing
+        them does not change how requests are handled. Today the gateway applies each plan's fixed
+        limits, a key's own rate limit, and the allowed-models lists of its team and project.
+      </Notice>
 
-      <QueryBoundary
-        query={settingsQuery}
-        loading={<TableSkeleton columns={3} rows={5} />}
-      >
+      <QueryBoundary query={settingsQuery} loading={<TableSkeleton columns={3} rows={5} />}>
         {(settings: AllSettings) => (
           <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid grid-cols-5 w-full max-w-2xl">
@@ -659,10 +666,7 @@ function SettingsContent() {
 
 export function SettingsPage() {
   return (
-    <Can
-      permission={Permission.MANAGE_SETTINGS}
-      fallback={<AccessDenied />}
-    >
+    <Can permission={Permission.MANAGE_SETTINGS} fallback={<AccessDenied />}>
       <SettingsContent />
     </Can>
   );

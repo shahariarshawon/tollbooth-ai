@@ -37,10 +37,7 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  getById(
-    @CurrentTenantId() tenantId: string,
-    @Param('id') id: string,
-  ) {
+  getById(@CurrentTenantId() tenantId: string, @Param('id') id: string) {
     return this.projectsService.getById(tenantId, id);
   }
 
@@ -67,10 +64,7 @@ export class ProjectsController {
   }
 
   @Get(':id/stats')
-  getStats(
-    @CurrentTenantId() tenantId: string,
-    @Param('id') id: string,
-  ) {
+  getStats(@CurrentTenantId() tenantId: string, @Param('id') id: string) {
     return this.projectsService.getStats(tenantId, id);
   }
 }

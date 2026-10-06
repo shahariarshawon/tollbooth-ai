@@ -30,6 +30,17 @@ export class AuthController {
     return this.auth.login(dto, ip);
   }
 
+  /**
+   * Starts a read-only session in the demo workspace. 404 unless DEMO_MODE is on. Limited per address and
+   * overall, because it needs no credentials.
+   */
+  @Post('demo')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit({ name: 'demo', windowSeconds: 60 * 60, perIp: 10, global: 300 })
+  demo(@ClientIp() ip?: string): Promise<AuthResult> {
+    return this.auth.startDemoSession(ip);
+  }
+
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @RateLimit({ name: 'refresh', windowSeconds: FIFTEEN_MINUTES, perIp: 60 })

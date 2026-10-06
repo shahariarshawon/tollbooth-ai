@@ -18,7 +18,6 @@ export interface UpdateProjectInput {
   monthlyBudget?: number;
 }
 
-// Planned REST contract. Served by the mock adapter until the backend ships these routes.
 export const projectService = {
   list: async (): Promise<Project[]> => (await http.get<Project[]>('/projects')).data,
 

@@ -17,6 +17,14 @@ export interface SessionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  /** True in the public demo workspace, whose sessions are read-only. */
+  isDemo: boolean;
+}
+
+/** A refresh token as issued: the secret to hand to the client, and when it stops working. */
+export interface IssuedRefreshToken {
+  token: string;
+  expiresAt: Date;
 }
 
 const SESSION_USER_SELECT = {
@@ -27,7 +35,7 @@ const SESSION_USER_SELECT = {
   lastName: true,
   role: true,
   status: true,
-  tenant: { select: { status: true } },
+  tenant: { select: { status: true, isDemo: true } },
 } satisfies Prisma.UserSelect;
 
 type RefreshClient = PrismaService | Prisma.TransactionClient;
@@ -45,8 +53,13 @@ export class TokenService {
     return createHash('sha256').update(rawToken).digest('hex');
   }
 
+  /**
+   * Signs an access token. It never outlives the session's refresh token (`sessionEndsAt`), so the end of
+   * a short session, such as the demo, is the end of access too and not up to 15 minutes later.
+   */
   async signAccessToken(
     user: Pick<SessionUser, 'id' | 'tenantId' | 'role'>,
+    sessionEndsAt: Date,
   ): Promise<{ accessToken: string; expiresIn: number }> {
     const payload: JwtPayload = {
       sub: user.id,
@@ -54,10 +67,12 @@ export class TokenService {
       tenantId: user.tenantId,
       role: user.role,
     };
-    return {
-      accessToken: await this.jwt.signAsync(payload),
-      expiresIn: durationToSeconds(this.config.JWT_ACCESS_EXPIRE),
-    };
+    const untilSessionEnds = Math.ceil((sessionEndsAt.getTime() - Date.now()) / 1000);
+    const expiresIn = Math.max(
+      1,
+      Math.min(durationToSeconds(this.config.JWT_ACCESS_EXPIRE), untilSessionEnds),
+    );
+    return { accessToken: await this.jwt.signAsync(payload, { expiresIn }), expiresIn };
   }
 
   /**
@@ -68,17 +83,16 @@ export class TokenService {
     userId: string,
     familyId: string = randomUUID(),
     client: RefreshClient = this.prisma,
-  ): Promise<string> {
-    const rawToken = randomBytes(48).toString('base64url');
+    /** Overrides the configured lifetime. Demo sessions use it to stay short. */
+    expiresAt: Date = new Date(
+      Date.now() + durationToSeconds(this.config.JWT_REFRESH_EXPIRE) * 1000,
+    ),
+  ): Promise<IssuedRefreshToken> {
+    const token = randomBytes(48).toString('base64url');
     await client.refreshToken.create({
-      data: {
-        userId,
-        familyId,
-        tokenHash: TokenService.hash(rawToken),
-        expiresAt: new Date(Date.now() + durationToSeconds(this.config.JWT_REFRESH_EXPIRE) * 1000),
-      },
+      data: { userId, familyId, tokenHash: TokenService.hash(token), expiresAt },
     });
-    return rawToken;
+    return { token, expiresAt };
   }
 
   /**
@@ -89,7 +103,7 @@ export class TokenService {
   async rotate(
     rawToken: string,
     ipAddress?: string,
-  ): Promise<{ user: SessionUser; refreshToken: string }> {
+  ): Promise<{ user: SessionUser; refreshToken: IssuedRefreshToken }> {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash: TokenService.hash(rawToken) },
       include: { user: { select: SESSION_USER_SELECT } },
@@ -109,7 +123,10 @@ export class TokenService {
         where: { id: stored.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      return claimed.count === 1 ? this.issueRefreshToken(user.id, stored.familyId, tx) : null;
+      if (claimed.count !== 1) return null;
+      // A demo session has a fixed end. Rotating keeps it, so refreshing can never extend it.
+      const expiresAt = user.tenant?.isDemo ? stored.expiresAt : undefined;
+      return this.issueRefreshToken(user.id, stored.familyId, tx, expiresAt);
     });
     if (!refreshToken) return this.rejectReuse(stored, ipAddress);
 
@@ -163,7 +180,9 @@ export class TokenService {
   }
 }
 
-export function toSessionUser(user: SessionUser): SessionUser {
+export function toSessionUser(
+  user: Omit<SessionUser, 'isDemo'> & { tenant: { isDemo: boolean } | null },
+): SessionUser {
   return {
     id: user.id,
     tenantId: user.tenantId,
@@ -171,5 +190,6 @@ export function toSessionUser(user: SessionUser): SessionUser {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    isDemo: user.tenant?.isDemo ?? false,
   };
 }

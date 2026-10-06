@@ -45,7 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         tenantId: true,
         role: true,
         status: true,
-        tenant: { select: { id: true, slug: true, status: true } },
+        tenant: { select: { id: true, slug: true, status: true, isDemo: true } },
       },
     });
 

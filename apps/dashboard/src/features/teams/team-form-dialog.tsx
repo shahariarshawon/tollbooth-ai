@@ -2,7 +2,14 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
@@ -31,12 +38,24 @@ export function TeamFormDialog({ team, onClose }: TeamFormDialogProps) {
 
   const [name, setName] = React.useState(team?.name ?? '');
   const [description, setDescription] = React.useState(team?.description ?? '');
-  const [rateLimitRpm, setRateLimitRpm] = React.useState(team?.rateLimitRpm ? String(team.rateLimitRpm) : '');
-  const [rateLimitRpd, setRateLimitRpd] = React.useState(team?.rateLimitRpd ? String(team.rateLimitRpd) : '');
-  const [tokenLimitTpm, setTokenLimitTpm] = React.useState(team?.tokenLimitTpm ? String(team.tokenLimitTpm) : '');
-  const [tokenLimitTpd, setTokenLimitTpd] = React.useState(team?.tokenLimitTpd ? String(team.tokenLimitTpd) : '');
-  const [monthlyBudget, setMonthlyBudget] = React.useState(team?.monthlyBudget ? String(team.monthlyBudget) : '');
-  const [dailyBudget, setDailyBudget] = React.useState(team?.dailyBudget ? String(team.dailyBudget) : '');
+  const [rateLimitRpm, setRateLimitRpm] = React.useState(
+    team?.rateLimitRpm ? String(team.rateLimitRpm) : '',
+  );
+  const [rateLimitRpd, setRateLimitRpd] = React.useState(
+    team?.rateLimitRpd ? String(team.rateLimitRpd) : '',
+  );
+  const [tokenLimitTpm, setTokenLimitTpm] = React.useState(
+    team?.tokenLimitTpm ? String(team.tokenLimitTpm) : '',
+  );
+  const [tokenLimitTpd, setTokenLimitTpd] = React.useState(
+    team?.tokenLimitTpd ? String(team.tokenLimitTpd) : '',
+  );
+  const [monthlyBudget, setMonthlyBudget] = React.useState(
+    team?.monthlyBudget ? String(team.monthlyBudget) : '',
+  );
+  const [dailyBudget, setDailyBudget] = React.useState(
+    team?.dailyBudget ? String(team.dailyBudget) : '',
+  );
   const [allowedModels, setAllowedModels] = React.useState<string[]>(team?.allowedModels ?? []);
 
   const toggleModel = (model: string) => {
@@ -216,9 +235,11 @@ export function TeamFormDialog({ team, onClose }: TeamFormDialogProps) {
                       }`}
                     >
                       <span className="truncate">{model}</span>
-                      <span className={`size-3 rounded-full border flex items-center justify-center ${
-                        checked ? 'bg-primary border-primary' : 'border-border'
-                      }`}>
+                      <span
+                        className={`size-3 rounded-full border flex items-center justify-center ${
+                          checked ? 'bg-primary border-primary' : 'border-border'
+                        }`}
+                      >
                         {checked && <span className="size-1.5 rounded-full bg-white" />}
                       </span>
                     </button>

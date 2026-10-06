@@ -10,6 +10,11 @@ class Controller {
   login(): void {}
 }
 
+class GlobalCapController {
+  @RateLimit({ name: 'demo', windowSeconds: 3600, perIp: 100, global: 3 })
+  start(): void {}
+}
+
 function contextFor(ip: string, email?: string) {
   const headers: Record<string, string> = {};
   const context = {
@@ -71,5 +76,23 @@ describe('RateLimitGuard', () => {
     await expect(
       guard.canActivate(contextFor('10.0.0.1', 'a@example.com').context),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('applies a ceiling across all clients, so many addresses cannot add up past it', async () => {
+    const guard = new RateLimitGuard(new Reflector(), new InMemoryRateLimitStore());
+    const from = (ip: string) =>
+      ({
+        getHandler: () => GlobalCapController.prototype.start,
+        getClass: () => GlobalCapController,
+        switchToHttp: () => ({
+          getRequest: () => ({ ip, body: {} }),
+          getResponse: () => ({ setHeader: () => undefined }),
+        }),
+      }) as unknown as ExecutionContext;
+
+    for (const ip of ['10.0.0.1', '10.0.0.2', '10.0.0.3']) {
+      await expect(guard.canActivate(from(ip))).resolves.toBe(true);
+    }
+    await expect(guard.canActivate(from('10.0.0.4'))).rejects.toMatchObject({ status: 429 });
   });
 });

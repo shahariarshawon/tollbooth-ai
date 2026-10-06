@@ -11,8 +11,3 @@ scrape_configs:
     static_configs:
       - targets: ['gateway:3000']
     metrics_path: /metrics
-
-  - job_name: tollbooth-control-plane
-    static_configs:
-      - targets: ['control-plane:3001']
-    metrics_path: /metrics

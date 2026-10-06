@@ -12,6 +12,12 @@ export const authService = {
     return data.user;
   },
 
+  /** Starts a read-only session in the demo workspace. Only works where the deployment enables it. */
+  async startDemo(): Promise<SessionUser> {
+    const { data } = await authHttp.post<{ user: SessionUser }>('/demo');
+    return data.user;
+  },
+
   async logout(): Promise<void> {
     await authHttp.post('/logout');
   },

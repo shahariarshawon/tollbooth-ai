@@ -11,8 +11,3 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:3000']
     metrics_path: /metrics
-
-  - job_name: tollbooth-control-plane
-    static_configs:
-      - targets: ['host.docker.internal:3001']
-    metrics_path: /metrics

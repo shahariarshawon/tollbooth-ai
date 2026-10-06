@@ -1,4 +1,5 @@
 import type { ProviderType } from '@tollbooth/database';
+import type { ProviderId } from '@tollbooth/shared';
 
 /** Provider-neutral request. Each provider translates it to its own API. */
 export interface ChatMessage {
@@ -52,7 +53,7 @@ export interface ModelInfo {
 }
 
 /** Stable short name of a provider. Used in logs and in the circuit breaker key (`provider:gemini:circuit`). */
-export type ProviderId = 'gemini' | 'openai' | 'anthropic';
+export type { ProviderId };
 
 export type ProviderErrorKind =
   /** The request itself was rejected (bad parameters). Safe to tell the caller. */

@@ -50,9 +50,7 @@ export const options = {
 
 const payload = JSON.stringify({
   model: 'gemini-2.0-flash',
-  messages: [
-    { role: 'user', content: 'Say "load test ok" in exactly three words.' },
-  ],
+  messages: [{ role: 'user', content: 'Say "load test ok" in exactly three words.' }],
   max_tokens: 20,
 });
 

@@ -65,10 +65,7 @@ function BillingContent() {
               />
             </div>
 
-            <QueryBoundary
-              query={historyQuery}
-              loading={<Skeleton className="h-64 w-full" />}
-            >
+            <QueryBoundary query={historyQuery} loading={<Skeleton className="h-64 w-full" />}>
               {(history) => (
                 <BillingHistoryTable
                   items={history.items}

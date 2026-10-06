@@ -44,7 +44,7 @@ export const NAV_ITEMS: AppNavItem[] = [
     label: 'API Keys',
     href: '/dashboard/api-keys',
     icon: KeyRound,
-    permission: Permission.API_KEY_CREATE,
+    permission: Permission.API_KEY_READ,
   },
   {
     label: 'Usage Analytics',

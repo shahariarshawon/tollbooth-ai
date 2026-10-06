@@ -14,7 +14,7 @@ import {
   ProviderUsageChart,
   RequestVolumeChart,
   TokenUsageChart,
-} from '../dashboard/charts';
+} from '../dashboard/lazy-charts';
 import { AnalyticsStats } from './analytics-stats';
 import { TopApiKeysTable, TopModelsTable, TopProjectsTable } from './analytics-tables';
 import {
@@ -57,7 +57,10 @@ function AnalyticsContent() {
   const cost = useAnalyticsCost(ANALYTICS_PERIOD_DAYS, pollInterval);
 
   const isRefreshing =
-    overview.isFetching || usage.isFetching || models.isFetching || (canViewBilling && cost.isFetching);
+    overview.isFetching ||
+    usage.isFetching ||
+    models.isFetching ||
+    (canViewBilling && cost.isFetching);
 
   const handleRefresh = () => {
     void overview.refetch();
@@ -96,7 +99,9 @@ function AnalyticsContent() {
             onClick={() => setAutoRefresh((prev) => !prev)}
             className="h-8 text-xs gap-1.5"
           >
-            <Radio className={`h-3.5 w-3.5 ${autoRefresh ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+            <Radio
+              className={`h-3.5 w-3.5 ${autoRefresh ? 'text-emerald-500' : 'text-muted-foreground'}`}
+            />
             {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
           </Button>
 
@@ -107,7 +112,9 @@ function AnalyticsContent() {
             disabled={isRefreshing}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-primary' : ''}`}
+            />
             Refresh
           </Button>
         </div>

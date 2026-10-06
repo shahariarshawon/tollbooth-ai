@@ -19,12 +19,12 @@ import {
   YAxis,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { DashboardOverview, NamedCount } from '@/types/api';
+import type { NamedCount } from '@/types/api';
 import { formatCompactNumber, formatCurrency, formatNumber } from '@/utils/format';
 
 /**
- * Presentational charts. Each takes plain data props, so connecting real analytics later means
- * changing the query that feeds them, not these components.
+ * Presentational charts. Each takes plain data props and a text `summary`, which becomes the chart's
+ * accessible name: a chart is an image to a screen reader, so the figures it shows are also written out.
  */
 
 const COLORS = [
@@ -51,16 +51,27 @@ const TOOLTIP = {
   labelStyle: { color: 'var(--muted-foreground)' },
 } as const;
 
+/** "1,234 total, peak 120 on Oct 3" for a daily series. */
+function summarizeDaily(unit: string, points: { date: string; value: number }[]): string {
+  if (points.length === 0) return `No ${unit} in this period.`;
+  const total = points.reduce((sum, point) => sum + point.value, 0);
+  const peak = points.reduce((best, point) => (point.value > best.value ? point : best));
+  return `${formatNumber(total)} ${unit} over ${points.length} days, peaking at ${formatNumber(peak.value)} on ${shortDate(peak.date)}.`;
+}
+
 const shortDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 function ChartCard({
   title,
   description,
+  summary,
   children,
 }: {
   title: string;
   description: string;
+  /** What the chart shows, in words, for assistive technology. */
+  summary: string;
   children: React.ReactElement;
 }) {
   return (
@@ -70,7 +81,7 @@ function ChartCard({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-64 w-full">
+        <div className="h-64 w-full" role="img" aria-label={`${title}. ${summary}`}>
           <ResponsiveContainer width="100%" height="100%">
             {children}
           </ResponsiveContainer>
@@ -80,9 +91,21 @@ function ChartCard({
   );
 }
 
-export function RequestVolumeChart({ data }: { data: DashboardOverview['requestVolume'] }) {
+export function RequestVolumeChart({
+  data,
+}: {
+  data: { date: string; requests: number; failures?: number }[];
+}) {
+  const showFailures = data.some((point) => (point.failures ?? 0) > 0);
   return (
-    <ChartCard title="Request volume" description="Requests per day">
+    <ChartCard
+      title="Request volume"
+      description="Requests per day"
+      summary={summarizeDaily(
+        'requests',
+        data.map((point) => ({ date: point.date, value: point.requests })),
+      )}
+    >
       <AreaChart data={data} margin={{ left: -8, right: 8, top: 8 }}>
         <defs>
           <linearGradient id="requestFill" x1="0" y1="0" x2="0" y2="1">
@@ -92,29 +115,48 @@ export function RequestVolumeChart({ data }: { data: DashboardOverview['requestV
         </defs>
         <CartesianGrid stroke={GRID} vertical={false} />
         <XAxis dataKey="date" tickFormatter={shortDate} minTickGap={32} {...AXIS} />
-        <YAxis tickFormatter={formatCompactNumber} width={48} {...AXIS} />
+        <YAxis tickFormatter={formatCompactNumber} width={48} allowDecimals={false} {...AXIS} />
         <Tooltip
           {...TOOLTIP}
           labelFormatter={(label) => shortDate(String(label))}
-          formatter={(value) => [formatNumber(Number(value)), 'Requests']}
+          formatter={(value, name) => [formatNumber(Number(value)), name]}
         />
+        {showFailures && <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
         <Area
           type="monotone"
           dataKey="requests"
+          name="Requests"
           stroke="var(--chart-1)"
           strokeWidth={2}
           fill="url(#requestFill)"
         />
+        {showFailures && (
+          <Line
+            type="monotone"
+            dataKey="failures"
+            name="Failed"
+            stroke="var(--destructive)"
+            strokeWidth={2}
+            strokeDasharray="4 3"
+            dot={false}
+          />
+        )}
       </AreaChart>
     </ChartCard>
   );
 }
 
-/** Phase 10: token usage over time. Same shape as RequestVolumeChart, one field over, for the
- *  analytics page's own trend chart (apps/control-plane's /analytics/usage, not DashboardOverview). */
+/** Token usage over time: the analytics page's trend chart (/analytics/usage). */
 export function TokenUsageChart({ data }: { data: { date: string; tokens: number }[] }) {
   return (
-    <ChartCard title="Token usage" description="Tokens per day">
+    <ChartCard
+      title="Token usage"
+      description="Tokens per day"
+      summary={summarizeDaily(
+        'tokens',
+        data.map((point) => ({ date: point.date, value: point.tokens })),
+      )}
+    >
       <AreaChart data={data} margin={{ left: -8, right: 8, top: 8 }}>
         <defs>
           <linearGradient id="tokenFill" x1="0" y1="0" x2="0" y2="1">
@@ -142,9 +184,14 @@ export function TokenUsageChart({ data }: { data: { date: string; tokens: number
   );
 }
 
-export function CostTrendChart({ data }: { data: DashboardOverview['costTrend'] }) {
+export function CostTrendChart({ data }: { data: { date: string; cost: number }[] }) {
+  const total = data.reduce((sum, point) => sum + point.cost, 0);
   return (
-    <ChartCard title="Cost trend" description="Estimated spend per day">
+    <ChartCard
+      title="Cost trend"
+      description="Estimated spend per day"
+      summary={`${formatCurrency(total)} estimated spend over ${data.length} days.`}
+    >
       <LineChart data={data} margin={{ left: -8, right: 8, top: 8 }}>
         <CartesianGrid stroke={GRID} vertical={false} />
         <XAxis dataKey="date" tickFormatter={shortDate} minTickGap={32} {...AXIS} />
@@ -162,7 +209,15 @@ export function CostTrendChart({ data }: { data: DashboardOverview['costTrend'] 
 
 export function ModelUsageChart({ data }: { data: NamedCount[] }) {
   return (
-    <ChartCard title="Model usage" description="Requests by model">
+    <ChartCard
+      title="Model usage"
+      description="Requests by model"
+      summary={
+        data.length === 0
+          ? 'No requests in this period.'
+          : data.map((row) => `${row.label}: ${formatNumber(row.value)}`).join('; ') + '.'
+      }
+    >
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 8 }}>
         <CartesianGrid stroke={GRID} horizontal={false} />
         <XAxis type="number" tickFormatter={formatCompactNumber} {...AXIS} />
@@ -180,7 +235,15 @@ export function ModelUsageChart({ data }: { data: NamedCount[] }) {
 
 export function ProviderUsageChart({ data }: { data: NamedCount[] }) {
   return (
-    <ChartCard title="Provider usage" description="Share of requests by provider">
+    <ChartCard
+      title="Provider usage"
+      description="Share of requests by provider"
+      summary={
+        data.length === 0
+          ? 'No requests in this period.'
+          : data.map((row) => `${row.label}: ${formatNumber(row.value)}`).join('; ') + '.'
+      }
+    >
       <PieChart>
         <Pie
           data={data}

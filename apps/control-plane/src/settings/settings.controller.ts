@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
 import { CurrentTenantId, CurrentUser } from '../common/decorators/request.decorators';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
 import { Permission } from '../roles/permission';

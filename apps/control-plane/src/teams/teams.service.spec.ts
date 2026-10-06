@@ -168,9 +168,9 @@ describe('TeamsService', () => {
       });
       prisma.user.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.addMember('tenant-1', 'team-1', { userId: 'unknown' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.addMember('tenant-1', 'team-1', { userId: 'unknown' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('removes a member from a team', async () => {

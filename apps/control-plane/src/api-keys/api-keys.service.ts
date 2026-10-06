@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '@tollbooth/database';
 import { AuditAction } from '../audit/audit-actions';
@@ -30,7 +26,9 @@ export class ApiKeysService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const startOfMonth = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    );
 
     return Promise.all(
       keys.map(async (key) => {

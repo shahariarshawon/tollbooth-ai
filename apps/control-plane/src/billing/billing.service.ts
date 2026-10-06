@@ -42,7 +42,32 @@ export interface BillingHistoryItem {
   createdAt: Date;
 }
 
-function startOfCurrentMonth(): Date {
+/** Monthly budget in USD: the tenant's own subscription limit, else its plan's, else a platform default. */
+const DEFAULT_MONTHLY_BUDGET_USD = 100;
+
+export function resolveMonthlyLimit(
+  subscription:
+    | { monthlyBudgetLimit: unknown; plan: { monthlyBudgetLimit: unknown } | null }
+    | null
+    | undefined,
+): number {
+  return Number(
+    subscription?.monthlyBudgetLimit ??
+      subscription?.plan?.monthlyBudgetLimit ??
+      DEFAULT_MONTHLY_BUDGET_USD,
+  );
+}
+
+/**
+ * Month-to-date spend in USD. The ledger is the financial record (charges are negative amounts) and
+ * `ai_requests` the operational one; the larger of the two is used so a missing ledger row cannot
+ * under-report spend.
+ */
+export function monthToDateSpend(ledgerAmount: unknown, requestCost: unknown): number {
+  return Math.max(Math.abs(Number(ledgerAmount ?? 0)), Number(requestCost ?? 0));
+}
+
+export function startOfCurrentMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
 }
@@ -95,14 +120,8 @@ export class BillingService {
     const subscription = tenant.subscription;
     const plan = subscription?.plan;
 
-    const monthlyLimit = Number(
-      subscription?.monthlyBudgetLimit ?? plan?.monthlyBudgetLimit ?? 100,
-    );
-
-    // Ledger amounts for AI_USAGE are recorded as negative values (charges), so take absolute
-    const ledgerSpend = Math.abs(Number(ledgerSum._sum.amount ?? 0));
-    const requestSpend = Number(requestsSum._sum.estimatedCost ?? 0);
-    const currentUsage = Math.max(ledgerSpend, requestSpend);
+    const monthlyLimit = resolveMonthlyLimit(subscription);
+    const currentUsage = monthToDateSpend(ledgerSum._sum.amount, requestsSum._sum.estimatedCost);
 
     const remainingBudget = Math.max(0, monthlyLimit - currentUsage);
     const totalTokens = Number(requestsSum._sum.totalTokens ?? 0);
@@ -110,8 +129,11 @@ export class BillingService {
     // Cost projection based on elapsed days in current month
     const now = new Date();
     const dayOfMonth = now.getUTCDate();
-    const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-    const projectedSpend = dayOfMonth > 0 ? (currentUsage / dayOfMonth) * daysInMonth : currentUsage;
+    const daysInMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    const projectedSpend =
+      dayOfMonth > 0 ? (currentUsage / dayOfMonth) * daysInMonth : currentUsage;
 
     const providerBreakdown: ProviderCostSummary[] = providerGroups.map((group) => {
       const cost = Number(group._sum.estimatedCost ?? 0);
@@ -139,6 +161,29 @@ export class BillingService {
       estimatedCost: Number(projectedSpend.toFixed(2)),
       totalTokens,
       providerBreakdown,
+    };
+  }
+
+  /** Month-to-date spend against the monthly budget: the figures `getSummary` shows, without its extras. */
+  async getMonthlyBudget(tenantId: string): Promise<{ limitUsd: number; spentUsd: number }> {
+    const from = startOfCurrentMonth();
+    const [subscription, ledger, requests] = await Promise.all([
+      this.prisma.tenantSubscription.findUnique({
+        where: { tenantId },
+        select: { monthlyBudgetLimit: true, plan: { select: { monthlyBudgetLimit: true } } },
+      }),
+      this.prisma.ledgerEntry.aggregate({
+        where: { tenantId, transactionType: 'AI_USAGE', createdAt: { gte: from } },
+        _sum: { amount: true },
+      }),
+      this.prisma.aiRequest.aggregate({
+        where: { tenantId, createdAt: { gte: from } },
+        _sum: { estimatedCost: true },
+      }),
+    ]);
+    return {
+      limitUsd: resolveMonthlyLimit(subscription),
+      spentUsd: monthToDateSpend(ledger._sum.amount, requests._sum.estimatedCost),
     };
   }
 
@@ -211,11 +256,7 @@ export class BillingService {
     return plan;
   }
 
-  async assignSubscription(
-    tenantId: string,
-    dto: AssignSubscriptionDto,
-    actorUserId?: string,
-  ) {
+  async assignSubscription(tenantId: string, dto: AssignSubscriptionDto, actorUserId?: string) {
     const plan = await this.prisma.billingPlan.findUnique({ where: { code: dto.planCode } });
     if (!plan) throw new NotFoundException(`Plan ${dto.planCode} not found`);
 

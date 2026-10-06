@@ -109,7 +109,7 @@ export class SettingsService {
     });
 
     const mergedValue = {
-      ...(existing?.value as Record<string, unknown> ?? {}),
+      ...((existing?.value as Record<string, unknown>) ?? {}),
       ...value,
     };
 

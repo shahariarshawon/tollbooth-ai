@@ -10,10 +10,8 @@ import {
 } from './support/context';
 
 /**
- * Phase 10: analytics endpoints read `ai_requests` and `ledger_entries`, which nothing in the control
- * plane writes (the gateway does). There is no `/projects` or `/api-keys` endpoint here yet either (see
- * README's roadmap), so the fixture rows below are inserted directly with Prisma, the same way the
- * gateway's own test fixtures are built.
+ * Analytics endpoints read `ai_requests` and `ledger_entries`, which the control plane never writes (the
+ * gateway does). The fixture rows below are inserted directly with Prisma, the way the gateway writes them.
  */
 describe('Analytics (e2e)', () => {
   let ctx: TestContext;

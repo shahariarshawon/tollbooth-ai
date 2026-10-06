@@ -107,6 +107,9 @@ model Tenant {
   slug        String       @unique @db.VarChar(63)
   plan        TenantPlan   @default(FREE)
   status      TenantStatus @default(ACTIVE)
+  // True only for the public demo workspace. Its sessions are read-only and short-lived (see
+  // docs/adr/0007-public-demo-architecture.md); no code path treats it as a bypass of tenant isolation.
+  isDemo      Boolean      @default(false)
   createdAt   DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
 

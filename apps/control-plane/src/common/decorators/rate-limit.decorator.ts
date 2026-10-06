@@ -8,6 +8,8 @@ export interface RateLimitOptions {
   perIp: number;
   /** Max requests per `email` body field in the window. Optional. */
   perEmail?: number;
+  /** Max requests from all clients together in the window. Optional. A ceiling on a public endpoint. */
+  global?: number;
 }
 
 export const RATE_LIMIT_KEY = 'rateLimit';

@@ -10,7 +10,6 @@ export interface CreateApiKeyInput {
   expiresAt?: string;
 }
 
-// Planned REST contract. Served by the mock adapter until the backend ships these routes.
 // Only create and rotate ever return a secret, and only once.
 export const apiKeyService = {
   list: async (): Promise<ApiKey[]> => (await http.get<ApiKey[]>('/api-keys')).data,

@@ -162,7 +162,16 @@ export class AuditService {
       },
     });
 
-    const headers = ['Timestamp', 'Action', 'Resource', 'Resource ID', 'Actor Email', 'Actor Name', 'IP Address', 'Metadata'];
+    const headers = [
+      'Timestamp',
+      'Action',
+      'Resource',
+      'Resource ID',
+      'Actor Email',
+      'Actor Name',
+      'IP Address',
+      'Metadata',
+    ];
     const rows = logs.map((log) => [
       log.createdAt.toISOString(),
       log.action,

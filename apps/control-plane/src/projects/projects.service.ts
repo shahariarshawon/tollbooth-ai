@@ -26,7 +26,9 @@ export class ProjectsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const startOfMonth = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    );
 
     return Promise.all(
       projects.map(async (project) => {
@@ -82,7 +84,9 @@ export class ProjectsService {
 
     if (!project) throw new NotFoundException('Project not found');
 
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const startOfMonth = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    );
     const stats = await this.prisma.aiRequest.aggregate({
       where: {
         tenantId,
@@ -192,7 +196,9 @@ export class ProjectsService {
       where: { projectId: id, status: 'ACTIVE' },
     });
     if (activeKeys > 0) {
-      throw new BadRequestException('Revoke or delete the API keys of this project before deleting it');
+      throw new BadRequestException(
+        'Revoke or delete the API keys of this project before deleting it',
+      );
     }
 
     await this.prisma.project.delete({ where: { id } });

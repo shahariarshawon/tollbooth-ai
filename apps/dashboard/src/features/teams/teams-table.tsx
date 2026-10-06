@@ -59,9 +59,10 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
           {teams.map((team) => {
             const monthlyBudget = team.monthlyBudget ? Number(team.monthlyBudget) : null;
             const currentSpend = Number(team.currentUsageCost ?? 0);
-            const budgetPercent = monthlyBudget && monthlyBudget > 0
-              ? Math.min(100, Math.round((currentSpend / monthlyBudget) * 100))
-              : null;
+            const budgetPercent =
+              monthlyBudget && monthlyBudget > 0
+                ? Math.min(100, Math.round((currentSpend / monthlyBudget) * 100))
+                : null;
 
             return (
               <TableRow key={team.id} className="hover:bg-muted/30 transition-colors">
@@ -91,7 +92,8 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                   >
                     <div className="flex -space-x-2 overflow-hidden">
                       {team.members.slice(0, 3).map((m) => {
-                        const fullName = `${m.user.firstName ?? ''} ${m.user.lastName ?? ''}`.trim();
+                        const fullName =
+                          `${m.user.firstName ?? ''} ${m.user.lastName ?? ''}`.trim();
                         const initials = fullName ? fullName.slice(0, 2) : m.user.email.slice(0, 2);
                         return (
                           <Avatar
@@ -105,7 +107,10 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                         );
                       })}
                     </div>
-                    <Badge variant="outline" className="text-xs font-normal group-hover:border-primary/60">
+                    <Badge
+                      variant="outline"
+                      className="text-xs font-normal group-hover:border-primary/60"
+                    >
                       <Users className="h-3 w-3 mr-1 text-muted-foreground" />
                       {team.members.length}
                     </Badge>
@@ -117,10 +122,14 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                   <div className="space-y-0.5 text-xs">
                     <div className="flex items-center gap-1.5 text-foreground">
                       <Zap className="h-3 w-3 text-amber-500 shrink-0" />
-                      <span>{team.rateLimitRpm ? `${team.rateLimitRpm.toLocaleString()} RPM` : '∞ RPM'}</span>
+                      <span>
+                        {team.rateLimitRpm ? `${team.rateLimitRpm.toLocaleString()} RPM` : '∞ RPM'}
+                      </span>
                     </div>
                     <div className="text-muted-foreground pl-4.5">
-                      {team.rateLimitRpd ? `${team.rateLimitRpd.toLocaleString()} RPD` : 'Unlimited / day'}
+                      {team.rateLimitRpd
+                        ? `${team.rateLimitRpd.toLocaleString()} RPD`
+                        : 'Unlimited / day'}
                     </div>
                   </div>
                 </TableCell>
@@ -129,10 +138,14 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                 <TableCell>
                   <div className="space-y-0.5 text-xs">
                     <div className="text-foreground font-medium">
-                      {team.tokenLimitTpm ? `${(team.tokenLimitTpm / 1000).toLocaleString()}k TPM` : '∞ TPM'}
+                      {team.tokenLimitTpm
+                        ? `${(team.tokenLimitTpm / 1000).toLocaleString()}k TPM`
+                        : '∞ TPM'}
                     </div>
                     <div className="text-muted-foreground">
-                      {team.tokenLimitTpd ? `${(team.tokenLimitTpd / 1_000_000).toFixed(1)}M TPD` : 'Unlimited tokens'}
+                      {team.tokenLimitTpd
+                        ? `${(team.tokenLimitTpd / 1_000_000).toFixed(1)}M TPD`
+                        : 'Unlimited tokens'}
                     </div>
                   </div>
                 </TableCell>
@@ -142,8 +155,7 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                   <div className="space-y-1 text-xs min-w-[130px]">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-foreground flex items-center gap-1">
-                        <Coins className="h-3 w-3 text-emerald-500" />
-                        ${currentSpend.toFixed(2)}
+                        <Coins className="h-3 w-3 text-emerald-500" />${currentSpend.toFixed(2)}
                       </span>
                       <span className="text-muted-foreground">
                         {monthlyBudget ? `/ $${monthlyBudget.toFixed(0)}` : '(No cap)'}
@@ -156,8 +168,8 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                             budgetPercent > 90
                               ? 'bg-destructive'
                               : budgetPercent > 75
-                              ? 'bg-amber-500'
-                              : 'bg-emerald-500'
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
                           }`}
                           style={{ width: `${budgetPercent}%` }}
                         />
@@ -215,7 +227,11 @@ export function TeamsTable({ teams, onEdit, onManageMembers, onDelete }: TeamsTa
                 <TableCell className="text-right pr-6">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      >
                         <MoreVertical className="h-4 w-4" />
                         <span className="sr-only">Open menu</span>
                       </Button>

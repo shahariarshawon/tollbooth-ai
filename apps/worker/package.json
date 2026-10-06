@@ -2,7 +2,7 @@
   "name": "@tollbooth/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "Background workers: Kafka consumers and BullMQ jobs",
+  "description": "Background worker: Kafka consumers",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",

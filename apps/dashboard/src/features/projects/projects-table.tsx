@@ -101,8 +101,7 @@ export function ProjectsTable({
               <TableCell>
                 <div className="text-xs space-y-0.5">
                   <div className="font-semibold text-foreground flex items-center gap-1">
-                    <Coins className="h-3 w-3 text-emerald-500" />
-                    ${currentCost.toFixed(2)}
+                    <Coins className="h-3 w-3 text-emerald-500" />${currentCost.toFixed(2)}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     {budget ? `Limit: $${budget}` : 'No cap'}

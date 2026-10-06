@@ -1,5 +1,5 @@
-import { loadConfig } from '@tollbooth/config';
-import type { AppConfig } from '@tollbooth/config';
+import { loadGatewayConfig } from '@tollbooth/config';
+import type { GatewayConfig as AppConfig } from '@tollbooth/config';
 import { randomUUID } from 'node:crypto';
 import { RedisConfigService } from '../../src/redis/redis.config';
 import { RedisFailurePolicy } from '../../src/redis/redis-failure.policy';
@@ -23,7 +23,7 @@ export interface RedisHarness {
 export async function createRedisHarness(
   overrides: Partial<AppConfig> = {},
 ): Promise<RedisHarness> {
-  const config: AppConfig = { ...loadConfig(), ...overrides };
+  const config: AppConfig = { ...loadGatewayConfig(), ...overrides };
   const redis = new RedisService(new RedisConfigService(config));
   await redis.onModuleInit();
 

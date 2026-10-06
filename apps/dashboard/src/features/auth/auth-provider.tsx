@@ -15,6 +15,7 @@ interface AuthContextValue {
   user: SessionUser | null;
   status: AuthStatus;
   login: (input: LoginInput) => Promise<SessionUser>;
+  startDemo: () => Promise<SessionUser>;
   logout: () => Promise<void>;
 }
 
@@ -60,6 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [queryClient],
   );
 
+  const startDemo = React.useCallback(async () => {
+    const user = await authService.startDemo();
+    queryClient.setQueryData(SESSION_KEY, user);
+    return user;
+  }, [queryClient]);
+
   const user = session.data ?? null;
   const status: AuthStatus = session.isPending
     ? 'loading'
@@ -68,8 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       : 'unauthenticated';
 
   const value = React.useMemo(
-    () => ({ user, status, login, logout: endSession }),
-    [user, status, login, endSession],
+    () => ({ user, status, login, startDemo, logout: endSession }),
+    [user, status, login, startDemo, endSession],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

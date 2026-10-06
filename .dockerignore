@@ -18,7 +18,6 @@ coverage
 .env
 .env.*
 !.env.example
-prisma/migrations
 *.tsbuildinfo
 k6
 docs

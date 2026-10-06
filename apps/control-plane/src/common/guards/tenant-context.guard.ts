@@ -57,7 +57,7 @@ export class TenantContextGuard implements CanActivate {
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: requestedTenantId },
-      select: { id: true, slug: true, status: true },
+      select: { id: true, slug: true, status: true, isDemo: true },
     });
     if (!tenant || tenant.status === 'DELETED') throw new NotFoundException('Tenant not found');
     request.tenant = tenant;

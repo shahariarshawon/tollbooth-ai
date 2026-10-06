@@ -61,7 +61,7 @@ function ApiKeysContent() {
         }
       />
       <p className="text-sm text-muted-foreground">
-        Preview: keys are simulated in your browser session until the API keys endpoint ships.
+        A key is shown once, when it is created or rotated. Only its hash is stored.
       </p>
 
       <Card>
@@ -137,7 +137,7 @@ function ApiKeysContent() {
 
 export function ApiKeysPage() {
   return (
-    <Can permission={Permission.API_KEY_CREATE} fallback={<AccessDenied />}>
+    <Can permission={Permission.API_KEY_READ} fallback={<AccessDenied />}>
       <ApiKeysContent />
     </Can>
   );

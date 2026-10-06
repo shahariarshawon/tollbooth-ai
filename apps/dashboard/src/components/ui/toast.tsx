@@ -42,12 +42,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = React.useMemo(
     () => ({
-      success: (message: string, title?: string) =>
-        addToast({ type: 'success', message, title }),
-      error: (message: string, title?: string) =>
-        addToast({ type: 'error', message, title }),
-      info: (message: string, title?: string) =>
-        addToast({ type: 'info', message, title }),
+      success: (message: string, title?: string) => addToast({ type: 'success', message, title }),
+      error: (message: string, title?: string) => addToast({ type: 'error', message, title }),
+      info: (message: string, title?: string) => addToast({ type: 'info', message, title }),
     }),
     [addToast],
   );
@@ -66,8 +63,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               t.type === 'info' && 'bg-card border-primary/30 text-card-foreground',
             )}
           >
-            {t.type === 'success' && <CheckCircle2 className="size-5 text-emerald-500 shrink-0 mt-0.5" />}
-            {t.type === 'error' && <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />}
+            {t.type === 'success' && (
+              <CheckCircle2 className="size-5 text-emerald-500 shrink-0 mt-0.5" />
+            )}
+            {t.type === 'error' && (
+              <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
+            )}
             {t.type === 'info' && <Info className="size-5 text-primary shrink-0 mt-0.5" />}
             <div className="flex-1 min-w-0">
               {t.title && <h4 className="font-semibold text-sm leading-tight mb-1">{t.title}</h4>}

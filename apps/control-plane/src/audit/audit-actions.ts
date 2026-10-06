@@ -2,6 +2,7 @@
 export const AuditAction = {
   // Authentication
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  DEMO_SESSION_STARTED: 'DEMO_SESSION_STARTED',
   LOGIN_FAILED: 'LOGIN_FAILED',
   LOGOUT: 'LOGOUT',
   TOKEN_REUSE_DETECTED: 'TOKEN_REUSE_DETECTED',
@@ -39,4 +40,3 @@ export const AuditAction = {
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
-

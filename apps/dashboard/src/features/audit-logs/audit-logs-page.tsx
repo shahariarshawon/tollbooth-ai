@@ -1,14 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Download,
-  Search,
-  Shield,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-} from 'lucide-react';
+import { Download, Search, Shield, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Permission } from '@tollbooth/shared';
 import { QueryBoundary } from '@/components/query-boundary';
 import { Button } from '@/components/ui/button';
@@ -113,12 +106,7 @@ function AuditLogsContent() {
               <RefreshCw className={`h-3.5 w-3.5 ${auditQuery.isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              className="gap-2 text-xs"
-            >
+            <Button variant="outline" size="sm" onClick={handleExportCsv} className="gap-2 text-xs">
               <Download className="h-3.5 w-3.5" />
               Export CSV
             </Button>
@@ -260,10 +248,7 @@ function AuditLogsContent() {
 
 export function AuditLogsPage() {
   return (
-    <Can
-      permission={Permission.VIEW_AUDIT_LOGS}
-      fallback={<AccessDenied />}
-    >
+    <Can permission={Permission.VIEW_AUDIT_LOGS} fallback={<AccessDenied />}>
       <AuditLogsContent />
     </Can>
   );

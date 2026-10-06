@@ -52,7 +52,9 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
               <TableHead className="font-semibold text-foreground">Action</TableHead>
               <TableHead className="font-semibold text-foreground">Resource</TableHead>
               <TableHead className="font-semibold text-foreground">IP Address</TableHead>
-              <TableHead className="text-right font-semibold text-foreground pr-6">Metadata</TableHead>
+              <TableHead className="text-right font-semibold text-foreground pr-6">
+                Metadata
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,7 +158,8 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
               Audit Event Details
             </DialogTitle>
             <DialogDescription>
-              Action: <span className="font-mono font-medium text-foreground">{selectedLog?.action}</span>
+              Action:{' '}
+              <span className="font-mono font-medium text-foreground">{selectedLog?.action}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -183,7 +186,9 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[11px]">IP Address</span>
-                  <span className="font-mono text-foreground">{selectedLog.ipAddress || 'None'}</span>
+                  <span className="font-mono text-foreground">
+                    {selectedLog.ipAddress || 'None'}
+                  </span>
                 </div>
               </div>
 

@@ -1,56 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { resolveRedisSettings } from '@tollbooth/config';
+import type { RedisSettings } from '@tollbooth/config';
 import type { RedisOptions } from 'ioredis';
 import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
-
-export interface RedisSettings {
-  host: string;
-  port: number;
-  username?: string;
-  password?: string;
-  tls: boolean;
-  db: number;
-  commandTimeoutMs: number;
-}
-
-type RedisEnv = Pick<
-  AppConfig,
-  | 'REDIS_URL'
-  | 'REDIS_HOST'
-  | 'REDIS_PORT'
-  | 'REDIS_PASSWORD'
-  | 'REDIS_TLS'
-  | 'REDIS_COMMAND_TIMEOUT_MS'
->;
-
-/**
- * Works out the connection from the environment. Discrete values win when REDIS_HOST is set (how most
- * managed Redis services hand out credentials); otherwise REDIS_URL is used, which also carries
- * username, password, database and TLS (`rediss://`).
- */
-export function resolveRedisSettings(env: RedisEnv): RedisSettings {
-  if (env.REDIS_HOST) {
-    return {
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT ?? 6379,
-      ...(env.REDIS_PASSWORD !== undefined && { password: env.REDIS_PASSWORD }),
-      tls: env.REDIS_TLS,
-      db: 0,
-      commandTimeoutMs: env.REDIS_COMMAND_TIMEOUT_MS,
-    };
-  }
-
-  const url = new URL(env.REDIS_URL);
-  return {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : 6379,
-    ...(url.username && { username: decodeURIComponent(url.username) }),
-    ...(url.password && { password: decodeURIComponent(url.password) }),
-    tls: url.protocol === 'rediss:' || env.REDIS_TLS || url.hostname.includes('upstash.io'),
-    db: url.pathname.length > 1 ? Number(url.pathname.slice(1)) || 0 : 0,
-    commandTimeoutMs: env.REDIS_COMMAND_TIMEOUT_MS,
-  };
-}
 
 const CONNECT_TIMEOUT_MS = 5000;
 

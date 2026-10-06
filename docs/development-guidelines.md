@@ -22,7 +22,7 @@ controllers / consumers  ->  application services (use cases)  ->  domain  <-  i
 - **Application**: use cases. They depend on interfaces (ports), never on Prisma, Redis or Kafka directly.
 - **Infrastructure**: Prisma repositories, Redis clients, Kafka producers, provider SDK adapters.
   These implement the ports.
-- **Interface**: controllers, guards, DTO validation, Kafka/BullMQ consumers. Keep them thin:
+- **Interface**: controllers, guards, DTO validation, Kafka consumers. Keep them thin:
   validate, delegate, map the result.
 
 ### SOLID, applied

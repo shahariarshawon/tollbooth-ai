@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Optimistic route guard: sends signed-out visitors to /login and signed-in ones away from it.
+ * Optimistic route guard: sends signed-out visitors to /login and signed-in ones away from it (and from /demo).
  * It only checks that a session cookie exists. Real authorization happens in the control plane
  * on every API call, so this is a UX convenience and not a security boundary.
  */
@@ -15,14 +15,13 @@ export function proxy(request: NextRequest): NextResponse {
     login.searchParams.set('next', pathname);
     return NextResponse.redirect(login);
   }
-  if (pathname === '/login' && signedIn) {
+  if ((pathname === '/login' || pathname === '/demo') && signedIn) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ['/dashboard/:path*', '/login'] };
+export const config = { matcher: ['/dashboard/:path*', '/login', '/demo'] };
 
 export const middleware = proxy;
 export default proxy;
-

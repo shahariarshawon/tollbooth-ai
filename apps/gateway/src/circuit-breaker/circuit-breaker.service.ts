@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { parseCircuitSnapshot } from '@tollbooth/shared';
+import type { CircuitSnapshot, CircuitState } from '@tollbooth/shared';
 import { logEvent } from '../common/logging/structured-logger';
 import { RedisKeys } from '../redis/redis.constants';
 import { RedisService } from '../redis/redis.service';
 import type { LuaScript } from '../redis/redis.service';
-
-export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerOptions {
   /** Consecutive failures (inside the window) that open the circuit. */
@@ -26,14 +26,6 @@ export interface CircuitDecision {
   state: CircuitState;
   /** When refused: seconds until a trial call will be allowed. */
   retryAfterSeconds: number;
-}
-
-/** The stored state, as in the `provider:{name}:circuit` key. An absent key means CLOSED with no failures. */
-export interface CircuitSnapshot {
-  state: CircuitState;
-  failureCount: number;
-  /** ISO timestamp of the latest failure, if any. */
-  lastFailure: string | null;
 }
 
 /**
@@ -222,14 +214,7 @@ export class CircuitBreakerService {
 
   /** The stored state, for operators and tests. Throws if Redis is unreachable. */
   async getState(provider: string): Promise<CircuitSnapshot> {
-    const raw = await this.redis.client.get(RedisKeys.circuit(provider));
-    if (!raw) return { state: 'CLOSED', failureCount: 0, lastFailure: null };
-    const stored = JSON.parse(raw) as Partial<CircuitSnapshot>;
-    return {
-      state: stored.state ?? 'CLOSED',
-      failureCount: stored.failureCount ?? 0,
-      lastFailure: stored.lastFailure ?? null,
-    };
+    return parseCircuitSnapshot(await this.redis.client.get(RedisKeys.circuit(provider)));
   }
 
   private logTransition(

@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Skeleton } from '@/components/ui/states';
 import { NotificationBell } from '@/features/alerts/notification-bell';
 import { useAuth } from '@/features/auth/auth-provider';
+import { DemoBanner } from '@/features/auth/demo-banner';
 import { AppSidebar } from '@/features/navigation/app-sidebar';
 import { TenantScopePicker } from '@/features/navigation/tenant-scope-picker';
 import { UserMenu } from '@/features/navigation/user-menu';
@@ -40,6 +41,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh">
+      <DemoBanner />
       <Navbar onMenuClick={() => setNavOpen(true)}>
         <TenantScopePicker className="hidden w-44 md:block" />
         <NotificationBell />

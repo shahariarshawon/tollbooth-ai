@@ -8,9 +8,11 @@ const passRes = { status: jest.fn().mockReturnThis() } as unknown as Response;
 function build(opts: { dbOk?: boolean; redisOk?: boolean } = {}) {
   const { dbOk = true, redisOk = true } = opts;
   const prisma = {
-    $queryRaw: jest.fn().mockImplementation(() =>
-      dbOk ? Promise.resolve([{ '?column?': 1 }]) : Promise.reject(new Error('db down')),
-    ),
+    $queryRaw: jest
+      .fn()
+      .mockImplementation(() =>
+        dbOk ? Promise.resolve([{ '?column?': 1 }]) : Promise.reject(new Error('db down')),
+      ),
   } as unknown as PrismaService;
   const redis = {
     health: jest.fn().mockResolvedValue({ healthy: redisOk, latencyMs: redisOk ? 1 : undefined }),

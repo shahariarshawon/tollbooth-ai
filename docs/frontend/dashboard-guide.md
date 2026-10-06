@@ -154,13 +154,22 @@ Token handling lives on the server, in `app/api`:
   `/api/cp/auth/*` is blocked so credentials can only be issued through the dedicated routes.
 - **Logout** revokes the refresh token at the control plane, then clears the cookies.
 
-### Mocked endpoints
+### Data comes from the control plane
 
-The backend has no projects, API keys or analytics endpoints yet. Their services are written against the
-planned REST contract (`/projects`, `/api-keys`, `/api-keys/:id/rotate`, `/api-keys/:id/revoke`,
-`/dashboard/overview`), and `services/mock/mock-adapter.ts` answers those paths in memory (it resets on reload).
-The pages say so. To go live, implement the routes, delete `services/mock/`, and remove the adapter from
-`api-client.ts` (or set `NEXT_PUBLIC_MOCK_API=false`).
+Every page reads real endpoints through `/api/cp`; there is no mock layer. The overview is one request,
+`GET /dashboard/overview`, which returns the headline numbers, the daily series, model and provider
+breakdowns, provider and circuit health, budget, recent requests and recent security/budget events for the
+tenant. Money fields are `null` for roles without `VIEW_BILLING`, and the UI omits those cards. The page
+refreshes every 30 seconds while the tab is visible (React Query pauses it in a hidden tab), and the chart
+library is loaded lazily so it is not part of the initial bundle.
+
+### Public pages and the demo
+
+`/` is a static landing page: it makes no backend call, so it works while the services are asleep. `/demo`
+offers a read-only session when the server has `DEMO_MODE=true`; `POST /api/auth/demo` starts it. A demo
+session shows a banner on every page, and `usePermission` reports only read permissions as granted, so write
+controls are hidden. That is a convenience: the control plane refuses demo writes regardless
+([ADR 0007](../adr/0007-public-demo-architecture.md)).
 
 ### API keys are shown once
 

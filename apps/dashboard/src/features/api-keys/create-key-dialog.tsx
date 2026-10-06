@@ -121,7 +121,11 @@ export function CreateKeyDialog({ onClose, onCreated }: CreateKeyDialogProps) {
         </Select>
       </Field>
 
-      <Field label="Team Assignment" htmlFor="key-team" hint="Link key to a team for usage rollup & rate limit enforcement">
+      <Field
+        label="Team Assignment"
+        htmlFor="key-team"
+        hint="Link key to a team for usage rollup & rate limit enforcement"
+      >
         <Select id="key-team" {...register('teamId')}>
           <option value="">No Team (Project default)</option>
           {teams?.map((team) => (

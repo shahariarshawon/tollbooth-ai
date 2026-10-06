@@ -30,6 +30,13 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   if (isCrossSite(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   const user = readUser(request);
   if (!user) return NextResponse.json({ message: 'Not signed in' }, { status: 401 });
+  // The demo workspace is read-only, and a rename is a write.
+  if (user.isDemo) {
+    return NextResponse.json(
+      { message: 'This action is disabled in the demo workspace' },
+      { status: 403 },
+    );
+  }
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const { firstName, lastName } = body ?? {};

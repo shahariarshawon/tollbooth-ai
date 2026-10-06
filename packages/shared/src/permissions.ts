@@ -132,3 +132,21 @@ export function isModuleAllowed(role: UserRole, module: string): boolean {
 export function getRolePermissions(role: UserRole): Permission[] {
   return Array.from(ROLE_PERMISSIONS[role] ?? []);
 }
+
+/**
+ * Permissions that only let a user look. The read-only demo workspace may use exactly these: the
+ * control plane rejects every write for a demo tenant, and the dashboard hides the matching controls.
+ */
+export const READ_ONLY_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
+  Permission.USER_READ,
+  Permission.TEAM_READ,
+  Permission.PROJECT_READ,
+  Permission.API_KEY_READ,
+  Permission.VIEW_ANALYTICS,
+  Permission.VIEW_BILLING,
+  Permission.VIEW_AUDIT_LOGS,
+]);
+
+export function isReadOnlyPermission(permission: Permission): boolean {
+  return READ_ONLY_PERMISSIONS.has(permission);
+}

@@ -16,11 +16,10 @@ export interface TokenSet {
   refreshToken: string;
   /** Access token lifetime in seconds. */
   expiresIn: number;
+  /** Refresh token lifetime in seconds. The control plane decides it: a demo session is much shorter. */
+  refreshExpiresIn: number;
   user: SessionUser;
 }
-
-// Must not exceed the control plane JWT_REFRESH_EXPIRE (7d by default).
-const REFRESH_MAX_AGE = Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS ?? 7 * 24 * 60 * 60);
 
 const base = {
   httpOnly: true,
@@ -37,15 +36,18 @@ export function applySession(response: NextResponse, tokens: TokenSet): void {
   response.cookies.set(COOKIE_NAMES.refresh, tokens.refreshToken, {
     ...base,
     path: '/api',
-    maxAge: REFRESH_MAX_AGE,
+    maxAge: tokens.refreshExpiresIn,
   });
   response.cookies.set(COOKIE_NAMES.user, JSON.stringify(tokens.user), {
     ...base,
     httpOnly: false,
     path: '/',
-    maxAge: REFRESH_MAX_AGE,
+    maxAge: tokens.refreshExpiresIn,
   });
 }
+
+/** A display cache outliving its session is harmless: the first API call that finds the session gone clears it. */
+const PROFILE_COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
 
 /** Rewrites only the public profile cookie, for example after the user renames themselves. */
 export function updateUserCookie(response: NextResponse, user: SessionUser): void {
@@ -53,7 +55,7 @@ export function updateUserCookie(response: NextResponse, user: SessionUser): voi
     ...base,
     httpOnly: false,
     path: '/',
-    maxAge: REFRESH_MAX_AGE,
+    maxAge: PROFILE_COOKIE_MAX_AGE,
   });
 }
 

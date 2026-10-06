@@ -22,6 +22,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:seed:reference": "tsx prisma/seed/index.ts reference",
+    "db:seed:demo": "tsx prisma/seed/index.ts reference demo",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
@@ -31,6 +33,7 @@
     "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.24",
     "@nestjs/schematics": "^11.1.0",
+    "@prisma/client": "^6.19.3",
     "@types/bcrypt": "^6.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.3",
@@ -46,11 +49,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.0"
   },
-  "dependencies": {
-    "@prisma/client": "^6.19.3"
-  },
   "prisma": {
     "schema": "prisma/schema.prisma",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed/index.ts reference dev"
   }
 }

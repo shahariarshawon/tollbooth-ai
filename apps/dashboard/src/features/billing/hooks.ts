@@ -3,10 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTenantScope } from '@/hooks/use-tenant-scope';
 import { billingService } from '@/services/billing.service';
-import type {
-  AssignSubscriptionInput,
-  UpdateBillingLimitsInput,
-} from '@/services/billing.service';
+import type { AssignSubscriptionInput, UpdateBillingLimitsInput } from '@/services/billing.service';
 
 export function useBillingSummary() {
   const scope = useTenantScope();
@@ -42,13 +39,11 @@ export function useBillingMutations() {
 
   return {
     assignSubscription: useMutation({
-      mutationFn: (input: AssignSubscriptionInput) =>
-        billingService.assignSubscription(input),
+      mutationFn: (input: AssignSubscriptionInput) => billingService.assignSubscription(input),
       onSuccess: refresh,
     }),
     updateLimits: useMutation({
-      mutationFn: (input: UpdateBillingLimitsInput) =>
-        billingService.updateLimits(input),
+      mutationFn: (input: UpdateBillingLimitsInput) => billingService.updateLimits(input),
       onSuccess: refresh,
     }),
   };

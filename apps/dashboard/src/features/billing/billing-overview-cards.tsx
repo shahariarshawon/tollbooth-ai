@@ -1,12 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Coins,
-  DollarSign,
-  TrendingUp,
-  Zap,
-} from 'lucide-react';
+import { Coins, DollarSign, TrendingUp, Zap } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { BillingSummary } from '@/types/api';
 
@@ -30,9 +25,10 @@ function formatTokens(val: number) {
 }
 
 export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
-  const percentUsed = summary.monthlyLimit > 0
-    ? Math.min(100, Math.round((summary.currentUsage / summary.monthlyLimit) * 100))
-    : 0;
+  const percentUsed =
+    summary.monthlyLimit > 0
+      ? Math.min(100, Math.round((summary.currentUsage / summary.monthlyLimit) * 100))
+      : 0;
 
   const isNearLimit = percentUsed >= 85;
 
@@ -81,9 +77,7 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(summary.remainingBudget)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Available before monthly hard cap
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Available before monthly hard cap</p>
           </div>
         </CardContent>
       </Card>

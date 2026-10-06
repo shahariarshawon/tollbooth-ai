@@ -7,4 +7,3 @@ import { PermissionMiddleware } from './permission.middleware';
   exports: [RolesGuard, PermissionMiddleware],
 })
 export class RolesModule {}
-

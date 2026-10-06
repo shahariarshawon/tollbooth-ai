@@ -1,13 +1,14 @@
 import { Global, Module } from '@nestjs/common';
-import { loadConfig } from '@tollbooth/config';
-import type { AppConfig } from '@tollbooth/config';
+import { loadControlPlaneConfig } from '@tollbooth/config';
+import type { ControlPlaneConfig } from '@tollbooth/config';
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
-export type { AppConfig };
+/** The control plane's validated environment. Aliased so the rest of the app names one `AppConfig`. */
+export type AppConfig = ControlPlaneConfig;
 
 @Global()
 @Module({
-  providers: [{ provide: APP_CONFIG, useFactory: (): AppConfig => loadConfig() }],
+  providers: [{ provide: APP_CONFIG, useFactory: (): AppConfig => loadControlPlaneConfig() }],
   exports: [APP_CONFIG],
 })
 export class ConfigModule {}

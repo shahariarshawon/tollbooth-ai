@@ -30,7 +30,11 @@ function Field({ label, htmlFor, error, hint, required, children, className }: F
     <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={htmlFor}>
         {label}
-        {required && <span className="text-destructive ml-0.5" aria-hidden="true">*</span>}
+        {required && (
+          <span className="text-destructive ml-0.5" aria-hidden="true">
+            *
+          </span>
+        )}
       </Label>
       {children}
       {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}

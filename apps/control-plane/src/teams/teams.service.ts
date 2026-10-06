@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@tollbooth/database';
 import { AuditAction } from '../audit/audit-actions';
 import { AuditService } from '../audit/audit.service';
@@ -35,7 +31,9 @@ export class TeamsService {
     });
 
     // Query month-to-date requests for projects in each team
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const startOfMonth = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    );
 
     return Promise.all(
       teams.map(async (team) => {
@@ -123,7 +121,9 @@ export class TeamsService {
 
     if (!team) throw new NotFoundException('Team not found');
 
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const startOfMonth = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    );
     const projectIds = team.projects.map((p) => p.id);
 
     let usageCost = 0;

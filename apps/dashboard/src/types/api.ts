@@ -15,6 +15,8 @@ export interface SessionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  /** True in the public demo workspace, which is read-only. */
+  isDemo: boolean;
 }
 
 export interface Page<T> {
@@ -264,30 +266,8 @@ export interface NamedCount {
   value: number;
 }
 
-/** A provider the gateway can route to. Active ones serve traffic; available ones are ready but switched off. */
-export interface ProviderOverview {
-  id: 'gemini' | 'openai' | 'anthropic';
-  name: string;
-  status: 'ACTIVE' | 'AVAILABLE';
-}
-
-export interface DashboardOverview {
-  providers: ProviderOverview[];
-  stats: {
-    totalRequests: number;
-    totalTokens: number;
-    currentSpend: number;
-    activeProjects: number;
-  };
-  requestVolume: { date: string; requests: number }[];
-  costTrend: { date: string; cost: number }[];
-  modelUsage: NamedCount[];
-  providerUsage: NamedCount[];
-}
-
 // ---------------------------------------------------------------------------
-// Analytics (Phase 10). Real endpoints on the control plane (apps/control-plane/src/analytics),
-// unlike DashboardOverview above, which is still sample data.
+// Analytics: apps/control-plane/src/analytics.
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsOverview {
@@ -331,8 +311,8 @@ export interface AnalyticsCost {
 }
 
 // ---------------------------------------------------------------------------
-// Alerts (Phase 11). Real endpoints on the control plane (apps/control-plane/src/alerts), written by
-// the gateway when it detects a budget, provider or security event (apps/gateway/src/alerts).
+// Alerts: apps/control-plane/src/alerts, written by the gateway when it detects a budget, provider or
+// security event (apps/gateway/src/alerts).
 // ---------------------------------------------------------------------------
 
 export type AlertType = 'BUDGET_LIMIT' | 'HIGH_USAGE' | 'PROVIDER_ERROR' | 'SECURITY_ALERT';

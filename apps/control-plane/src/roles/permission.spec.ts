@@ -1,10 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { Response } from 'express';
-import {
-  Permission,
-  getRolePermissions,
-  isModuleAllowed,
-} from '@tollbooth/shared';
+import { Permission, getRolePermissions, isModuleAllowed } from '@tollbooth/shared';
 import { PermissionMiddleware } from './permission.middleware';
 import type { RequestWithPermissions } from './permission.middleware';
 

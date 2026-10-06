@@ -16,8 +16,16 @@ export const billingService = {
   getSummary: async (): Promise<BillingSummary> =>
     (await http.get<BillingSummary>('/billing/summary')).data,
 
-  getHistory: async (page = 1, limit = 20): Promise<{ items: BillingHistoryItem[]; total: number; page: number; limit: number; totalPages: number }> =>
-    (await http.get('/billing/history', { params: { page, limit } })).data,
+  getHistory: async (
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    items: BillingHistoryItem[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> => (await http.get('/billing/history', { params: { page, limit } })).data,
 
   listPlans: async (): Promise<BillingPlanItem[]> =>
     (await http.get<BillingPlanItem[]>('/billing/plans')).data,

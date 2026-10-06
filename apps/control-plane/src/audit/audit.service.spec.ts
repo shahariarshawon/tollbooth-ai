@@ -23,10 +23,7 @@ describe('AuditService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuditService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [AuditService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<AuditService>(AuditService);
@@ -131,7 +128,9 @@ describe('AuditService', () => {
       ]);
 
       const csv = await service.exportCsv('tenant-123', { page: 1, limit: 1000 });
-      expect(csv).toContain('Timestamp,Action,Resource,Resource ID,Actor Email,Actor Name,IP Address,Metadata');
+      expect(csv).toContain(
+        'Timestamp,Action,Resource,Resource ID,Actor Email,Actor Name,IP Address,Metadata',
+      );
       expect(csv).toContain('LOGIN');
       expect(csv).toContain('10.0.0.1');
     });

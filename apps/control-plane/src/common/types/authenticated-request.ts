@@ -5,6 +5,8 @@ export interface TenantSummary {
   id: string;
   slug: string;
   status: TenantStatus;
+  /** The public demo workspace: its sessions are read-only (see DemoPolicyGuard). */
+  isDemo: boolean;
 }
 
 /** Identity resolved from the database on every request; the JWT only identifies the user. */

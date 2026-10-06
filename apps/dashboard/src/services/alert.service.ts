@@ -1,7 +1,7 @@
 import type { Alert, Page, PageParams } from '@/types/api';
 import { http } from './api-client';
 
-/** Real control-plane endpoints (apps/control-plane/src/alerts), not mocked. */
+/** Control-plane endpoints: apps/control-plane/src/alerts. */
 export const alertService = {
   list: async (params: PageParams = {}): Promise<Page<Alert>> =>
     (await http.get<Page<Alert>>('/alerts', { params })).data,

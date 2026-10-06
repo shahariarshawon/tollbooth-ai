@@ -21,8 +21,9 @@ import type { RateLimitStore } from '../rate-limit/rate-limit.store';
  * @RateLimit. It counts every request, not only failures, so it also limits credential stuffing
  * that mostly succeeds against weak accounts.
  *
- * Fails closed: if the store is unreachable the request is rejected, because silently disabling
- * brute-force protection is worse than briefly rejecting logins.
+ * Fails closed if the store throws: silently disabling brute-force protection is worse than briefly
+ * rejecting logins. The Redis-backed store itself degrades to per-instance in-memory counters when
+ * Redis is unreachable, so limits keep applying (per instance) through a Redis outage.
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
@@ -45,6 +46,10 @@ export class RateLimitGuard implements CanActivate {
     const keys = [
       { key: `rl:${options.name}:ip:${request.ip ?? 'unknown'}`, limit: options.perIp },
     ];
+
+    if (options.global !== undefined) {
+      keys.push({ key: `rl:${options.name}:global`, limit: options.global });
+    }
 
     const email = (request.body as { email?: unknown } | undefined)?.email;
     if (options.perEmail !== undefined && typeof email === 'string') {

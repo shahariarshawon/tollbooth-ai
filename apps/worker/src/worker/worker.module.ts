@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { loadConfig } from '@tollbooth/config';
+import { loadWorkerConfig } from '@tollbooth/config';
 import { KafkaModule, parseBrokers } from '@tollbooth/kafka';
 import { UsageWorker } from './usage.worker';
 
@@ -8,7 +8,7 @@ import { UsageWorker } from './usage.worker';
     KafkaModule.forRootAsync({
       useFactory: () => ({
         clientId: 'tollbooth-worker',
-        brokers: parseBrokers(loadConfig().KAFKA_BROKER),
+        brokers: parseBrokers(loadWorkerConfig().KAFKA_BROKER),
       }),
     }),
   ],

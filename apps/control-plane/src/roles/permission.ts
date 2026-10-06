@@ -9,4 +9,3 @@ export {
   USER_ROLES,
 } from '@tollbooth/shared';
 export type { UserRole } from '@tollbooth/shared';
-

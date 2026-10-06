@@ -90,7 +90,10 @@ describe('Full pipeline integration test (e2e)', () => {
   it('rejects a request with an invalid API key with 401', async () => {
     await http(ctx)
       .post('/v1/chat/completions')
-      .set({ Authorization: 'Bearer tb_not_a_real_key_00000000000000000000000000000000000000000000000000' })
+      .set({
+        Authorization:
+          'Bearer tb_not_a_real_key_00000000000000000000000000000000000000000000000000',
+      })
       .send(chat())
       .expect(401);
   });

@@ -105,7 +105,8 @@ export function ApiKeysTable({ keys, onRotate, onRevoke }: ApiKeysTableProps) {
                   <span>${cost.toFixed(2)}</span>
                 </div>
                 <div className="text-muted-foreground text-[11px]">
-                  {formatNumber(requests)} reqs • {tokens > 1000 ? `${(tokens / 1000).toFixed(0)}k` : tokens} tok
+                  {formatNumber(requests)} reqs •{' '}
+                  {tokens > 1000 ? `${(tokens / 1000).toFixed(0)}k` : tokens} tok
                 </div>
               </TableCell>
 
