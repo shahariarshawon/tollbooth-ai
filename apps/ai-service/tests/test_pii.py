@@ -1,4 +1,4 @@
-from app.security.pii import find_pii
+from app.security.pii import find_pii, redact_pii
 
 
 def test_finds_nothing_in_ordinary_text():
@@ -20,6 +20,25 @@ def test_one_match_per_type_even_with_repeats():
 
 
 def test_finds_several_pii_types_in_one_text():
-    text = "Reach me at a@example.com or 415-555-2671, card 4111 1111 1111 1111."
+    text = "Reach me at a@example.com or 415-555-2671, card 4111 1111 1111 1111, SSN 000-12-3456."
     types = {m.type for m in find_pii(text)}
-    assert types == {"email", "phone_number", "credit_card"}
+    assert types == {"email", "phone_number", "credit_card", "ssn"}
+
+
+def test_finds_api_key_and_bearer_token():
+    text = "My OpenAI key is sk-1234567890abcdef1234567890 and Tollbooth tb_abcdef1234567890"
+    types = {m.type for m in find_pii(text)}
+    assert "api_key" in types
+
+
+def test_redact_pii_replaces_sensitive_values():
+    text = "User jane@test.com phone 415-555-2671 card 4111 1111 1111 1111 SSN 123-45-6789"
+    redacted = redact_pii(text)
+    assert "jane@test.com" not in redacted
+    assert "415-555-2671" not in redacted
+    assert "4111 1111 1111 1111" not in redacted
+    assert "123-45-6789" not in redacted
+    assert "[REDACTED_EMAIL]" in redacted
+    assert "[REDACTED_PHONE]" in redacted
+    assert "[REDACTED_CREDIT_CARD]" in redacted
+    assert "[REDACTED_SSN]" in redacted

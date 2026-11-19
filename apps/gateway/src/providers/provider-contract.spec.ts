@@ -72,11 +72,10 @@ describe.each<[string, AIProvider, string, string]>([
     expect(provider.validateModel('not-a-real-model')).toBe(false);
   });
 
-  it('rejects streamCompletion with a classified, not-yet-supported error', async () => {
-    await expect(provider.streamCompletion(request)).rejects.toMatchObject({
-      name: 'ProviderError',
-      kind: 'bad_request',
-    });
+  it('returns an async iterable for streamCompletion', () => {
+    const stream = provider.streamCompletion(request);
+    expect(stream).toBeDefined();
+    expect(Symbol.asyncIterator in stream).toBe(true);
   });
 
   it('is configured when it has a key', () => {

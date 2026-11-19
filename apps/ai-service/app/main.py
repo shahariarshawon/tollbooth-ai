@@ -13,7 +13,7 @@ from app.security.models import (
     SecurityCheckResponse,
     SecurityIssue,
 )
-from app.security.pii import find_pii
+from app.security.pii import find_pii, redact_pii
 from app.security.prompt_guard import find_content_violations, find_prompt_injection
 
 app = FastAPI(title="Tollbooth AI Service")
@@ -22,9 +22,20 @@ _started_at = time.monotonic()
 _cache_service = CacheService()
 
 
+@app.middleware("http")
+async def trace_propagation_middleware(request, call_next):
+    request_id = request.headers.get("x-request-id") or request.headers.get("x-correlation-id")
+    traceparent = request.headers.get("traceparent")
+    response = await call_next(request)
+    if request_id:
+        response.headers["x-request-id"] = request_id
+    if traceparent:
+        response.headers["traceparent"] = traceparent
+    return response
+
+
 def get_cache_service() -> CacheService:
-    """A FastAPI dependency, not a direct reference to the module-level instance, so tests can
-    swap in a fake (tests/test_cache.py) via `app.dependency_overrides`, skipping real Redis."""
+    """FastAPI dependency injection for cache service."""
     return _cache_service
 
 
@@ -42,10 +53,13 @@ def health() -> dict[str, str | int]:
 
 @app.post("/security/check", response_model=SecurityCheckResponse)
 def check_security(request: SecurityCheckRequest) -> SecurityCheckResponse:
-    """Runs every check (PII, prompt injection, the content filter) in one call: the gateway
-    needs one round trip per request, not one per kind of check."""
+    """Evaluates input text against PII, prompt injection, and dangerous content.
+
+    Supports configurable ALLOW, BLOCK, and REDACT policy decisions.
+    """
+    pii_matches = find_pii(request.text)
     issues: list[SecurityIssue] = [
-        SecurityIssue(type=match.type, preview=match.preview) for match in find_pii(request.text)
+        SecurityIssue(type=match.type, preview=match.preview) for match in pii_matches
     ]
 
     injection_matches = find_prompt_injection(request.text)
@@ -56,10 +70,46 @@ def check_security(request: SecurityCheckRequest) -> SecurityCheckResponse:
     content_matches = find_content_violations(request.text)
     issues += [SecurityIssue(type="content_filter", preview=phrase) for phrase in content_matches]
 
+    has_pii = len(pii_matches) > 0
+    has_injection = len(injection_matches) > 0
+    has_content = len(content_matches) > 0
+
+    pii_action = (
+        request.policy.pii_action
+        if request.policy
+        else ("redact" if request.action_mode == "redact" else "block")
+    )
+    injection_action = request.policy.injection_action if request.policy else "block"
+    content_action = request.policy.content_action if request.policy else "block"
+
+    should_block = False
+    action = "allow"
+    redacted_text: str | None = None
+
+    if has_injection and injection_action == "block":
+        should_block = True
+        action = "block"
+    elif has_content and content_action == "block":
+        should_block = True
+        action = "block"
+    elif has_pii:
+        if pii_action == "block":
+            should_block = True
+            action = "block"
+        elif pii_action == "redact":
+            action = "redact"
+            redacted_text = redact_pii(request.text)
+        elif pii_action == "allow":
+            action = "allow"
+    elif not issues:
+        action = "allow"
+
     return SecurityCheckResponse(
-        blocked=len(issues) > 0,
+        blocked=should_block or (len(issues) > 0 and action == "block"),
         safe=len(injection_matches) == 0,
         issues=issues,
+        action=action,
+        redacted_text=redacted_text,
     )
 
 
@@ -67,13 +117,27 @@ def check_security(request: SecurityCheckRequest) -> SecurityCheckResponse:
 async def store_cache_entry(
     request: CacheStoreRequest, cache: CacheDependency
 ) -> CacheStoreResponse:
-    await cache.set(request.prompt, request.response, request.ttl_seconds)
-    return CacheStoreResponse(cached=True, key=make_cache_key(request.prompt))
+    await cache.set(
+        request.prompt,
+        request.response,
+        ttl_seconds=request.ttl_seconds,
+        tenant_id=request.tenant_id,
+        model=request.model,
+    )
+    key = make_cache_key(
+        request.prompt, tenant_id=request.tenant_id, model=request.model
+    )
+    return CacheStoreResponse(cached=True, key=key)
 
 
 @app.post("/security/cache/lookup", response_model=CacheLookupResponse)
 async def lookup_cache_entry(
     request: CacheLookupRequest, cache: CacheDependency
 ) -> CacheLookupResponse:
-    cached = await cache.get(request.prompt)
+    cached = await cache.get(request.prompt, tenant_id=request.tenant_id, model=request.model)
     return CacheLookupResponse(hit=cached is not None, response=cached)
+
+
+@app.get("/security/cache/metrics")
+def get_cache_metrics(cache: CacheDependency) -> dict[str, int | float]:
+    return cache.get_metrics()

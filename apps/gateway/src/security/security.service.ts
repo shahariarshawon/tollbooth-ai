@@ -14,6 +14,11 @@ export interface SecurityCheckResult {
   issues: SecurityIssue[];
 }
 
+export interface TraceContext {
+  requestId?: string;
+  traceparent?: string;
+}
+
 /** Never blocks, and reports nothing: used only when the check itself could not be completed and the
  *  gateway is configured to fail open (GATEWAY_SECURITY_FAIL_OPEN=true). */
 const UNCHECKED_RESULT: SecurityCheckResult = { blocked: false, safe: true, issues: [] };
@@ -33,13 +38,17 @@ export class SecurityService {
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
-  async check(text: string): Promise<SecurityCheckResult> {
+  async check(text: string, context?: TraceContext): Promise<SecurityCheckResult> {
     try {
       const response = await fetch(
         `${this.config.AI_SERVICE_URL.replace(/\/+$/, '')}/security/check`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(context?.requestId && { 'X-Request-ID': context.requestId }),
+            ...(context?.traceparent && { traceparent: context.traceparent }),
+          },
           body: JSON.stringify({ text }),
           signal: AbortSignal.timeout(this.config.GATEWAY_SECURITY_TIMEOUT_MS),
         },

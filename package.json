@@ -28,7 +28,8 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
-    "gateway:test": "tsx --env-file=.env scripts/test-gateway.ts"
+    "gateway:test": "tsx --env-file=.env scripts/test-gateway.ts",
+    "perf:benchmark": "tsx scripts/perf-benchmark.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

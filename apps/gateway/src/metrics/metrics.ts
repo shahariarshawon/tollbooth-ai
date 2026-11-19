@@ -46,6 +46,30 @@ export const costTotalUsd = new Counter({
   labelNames: ['provider', 'model'] as const,
 });
 
+export const cacheHitsTotal = new Counter({
+  name: 'ai_cache_hits_total',
+  help: 'Total AI semantic/exact cache hits',
+  labelNames: ['tenant_id', 'model'] as const,
+});
+
+export const cacheMissesTotal = new Counter({
+  name: 'ai_cache_misses_total',
+  help: 'Total AI cache misses',
+  labelNames: ['tenant_id', 'model'] as const,
+});
+
+export const aiFailoverTotal = new Counter({
+  name: 'ai_provider_failover_total',
+  help: 'Total AI provider failover attempts',
+  labelNames: ['from_provider', 'to_provider', 'reason'] as const,
+});
+
+export const aiStreamingRequestsTotal = new Counter({
+  name: 'ai_streaming_requests_total',
+  help: 'Total AI streaming requests',
+  labelNames: ['provider', 'model', 'status'] as const,
+});
+
 export { register as metricsRegistry };
 
 export function recordAiSuccess(

@@ -1,6 +1,10 @@
 import type { TokenCounter } from '../tokens/token-counter.service';
-import { ProviderError } from './provider.interface';
-import type { ChatCompletionRequest, ChatCompletionResult, TokenUsage } from './provider.interface';
+import type {
+  ChatCompletionChunk,
+  ChatCompletionRequest,
+  ChatCompletionResult,
+  TokenUsage,
+} from './provider.interface';
 
 /**
  * The default way to turn a result into token counts: trust what the provider reported, and count for
@@ -32,12 +36,60 @@ export function usageFromResult(
 }
 
 /**
- * Shared body for every provider's `streamCompletion`: streaming is not implemented yet (see Phase 6
- * notes in docs/architecture/provider-router.md), so a client that asks for it gets a clear, immediate
- * rejection rather than a connection that silently never streams.
+ * Streams completion chunks from a completed response, splitting deltas into chunks.
+ * Responds to AbortSignal if client disconnects.
  */
-export function rejectStreaming(): Promise<never> {
-  return Promise.reject(
-    new ProviderError('bad_request', 'Streaming responses are not supported yet'),
-  );
+export async function* synthesizeChunkStream(
+  result: ChatCompletionResult,
+  signal?: AbortSignal,
+): AsyncIterable<ChatCompletionChunk> {
+  const content = result.choices[0]?.message.content ?? '';
+  const now = result.created;
+
+  // Initial delta indicating assistant role
+  yield {
+    id: result.id,
+    created: now,
+    model: result.model,
+    choices: [
+      {
+        index: 0,
+        delta: { role: 'assistant', content: '' },
+        finishReason: null,
+      },
+    ],
+  };
+
+  // Stream content in segments
+  const chunks = content.match(/(\S+\s*)/g) ?? (content ? [content] : []);
+  for (const chunk of chunks) {
+    if (signal?.aborted) return;
+    yield {
+      id: result.id,
+      created: now,
+      model: result.model,
+      choices: [
+        {
+          index: 0,
+          delta: { content: chunk },
+          finishReason: null,
+        },
+      ],
+    };
+  }
+
+  // Final chunk indicating finish reason
+  yield {
+    id: result.id,
+    created: now,
+    model: result.model,
+    choices: [
+      {
+        index: 0,
+        delta: {},
+        finishReason: result.choices[0]?.finishReason ?? 'stop',
+      },
+    ],
+    ...(result.usage && { usage: result.usage }),
+  };
 }

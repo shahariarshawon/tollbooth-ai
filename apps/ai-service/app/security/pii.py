@@ -1,9 +1,8 @@
-"""Regex-based PII detection (Phase 9, Task 2).
+"""Regex-based PII detection and redaction.
 
-Deliberately simple: pattern matching plus a Luhn checksum for credit cards, not a trained NER
-model. Good enough to catch the common, obvious cases and to prove the gateway's "AI Security
-Check" step out end to end; a later phase can swap this module's internals for something smarter
-(an NER model, a vendor API) without changing its interface (`find_pii(text) -> list[PiiMatch]`).
+Covers email, phone numbers, passport numbers, credit cards (with Luhn validation),
+US Social Security Numbers (SSN), and API keys/tokens.
+Provides safe masked previews for logging and audit traces, and in-place redaction.
 """
 
 from __future__ import annotations
@@ -13,29 +12,26 @@ from dataclasses import dataclass
 
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
-# Loose on purpose: common separators (space, dash, dot, parens) across a plausible digit count.
-# This is a "looks like a phone number" heuristic, not a validated parser for any country's format.
 PHONE_PATTERN = re.compile(
     r"(?<!\d)(?:\+?\d{1,3}[-.\s]?)?(?:\(\d{2,4}\)[-.\s]?)?\d{3}[-.\s]?\d{3,4}[-.\s]?\d{0,4}(?!\d)"
 )
 
-# Heuristic, not a per-country validator: one or two letters followed by 6-9 digits covers many
-# real passport formats (a US passport, for example: one letter + 8 digits), not an exhaustive list.
 PASSPORT_PATTERN = re.compile(r"\b[A-Z]{1,2}\d{6,9}\b")
 
-# Candidate digit runs, grouped by spaces or dashes the way a card number is usually written;
-# checked against the Luhn algorithm below so an arbitrary long number is not flagged as one.
 CREDIT_CARD_CANDIDATE_PATTERN = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
 
-# Minimum digits for PHONE_PATTERN's loose match to count as a real phone number rather than noise.
+SSN_PATTERN = re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")
+
+API_KEY_PATTERN = re.compile(
+    r"\b(?:sk-[a-zA-Z0-9_-]{20,}|tb_[a-zA-Z0-9_-]{20,}|Bearer\s+eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+)\b"
+)
+
 _MIN_PHONE_DIGITS = 7
 
 
 @dataclass(frozen=True)
 class PiiMatch:
     type: str
-    """A masked preview of what matched, never the raw value: the security check's own response must
-    not become a second place the PII leaks to (logs, a client that echoes it back, and so on)."""
     preview: str
 
 
@@ -58,7 +54,7 @@ def _luhn_checksum_is_valid(digits: str) -> bool:
 
 
 def find_pii(text: str) -> list[PiiMatch]:
-    """One match per PII type found (not every occurrence), each as a masked preview."""
+    """One match per PII type found, each as a safely masked preview."""
     found: dict[str, str] = {}
 
     for match in EMAIL_PATTERN.finditer(text):
@@ -72,9 +68,49 @@ def find_pii(text: str) -> list[PiiMatch]:
         if 13 <= len(digits) <= 19 and _luhn_checksum_is_valid(digits):
             found.setdefault("credit_card", match.group())
 
+    for match in SSN_PATTERN.finditer(text):
+        found.setdefault("ssn", match.group())
+
+    for match in API_KEY_PATTERN.finditer(text):
+        found.setdefault("api_key", match.group())
+
     for match in PHONE_PATTERN.finditer(text):
         digits = re.sub(r"\D", "", match.group())
         if len(digits) >= _MIN_PHONE_DIGITS:
-            found.setdefault("phone_number", match.group())
+            # Avoid re-matching a credit card or SSN as phone number
+            matched_str = match.group()
+            if not SSN_PATTERN.fullmatch(matched_str.strip()):
+                found.setdefault("phone_number", matched_str)
 
     return [PiiMatch(type=pii_type, preview=_mask(value)) for pii_type, value in found.items()]
+
+
+def redact_pii(text: str) -> str:
+    """Returns the input text with all detected PII replaced with redaction tokens."""
+    redacted = text
+
+    # Redact API keys and bearer tokens first
+    redacted = API_KEY_PATTERN.sub("[REDACTED_API_KEY]", redacted)
+
+    # Redact email addresses
+    redacted = EMAIL_PATTERN.sub("[REDACTED_EMAIL]", redacted)
+
+    # Redact credit cards (valid Luhn only)
+    for match in list(CREDIT_CARD_CANDIDATE_PATTERN.finditer(redacted)):
+        digits = re.sub(r"[ -]", "", match.group())
+        if 13 <= len(digits) <= 19 and _luhn_checksum_is_valid(digits):
+            redacted = redacted.replace(match.group(), "[REDACTED_CREDIT_CARD]")
+
+    # Redact SSNs
+    redacted = SSN_PATTERN.sub("[REDACTED_SSN]", redacted)
+
+    # Redact Passports
+    redacted = PASSPORT_PATTERN.sub("[REDACTED_PASSPORT]", redacted)
+
+    # Redact phone numbers
+    for match in list(PHONE_PATTERN.finditer(redacted)):
+        digits = re.sub(r"\D", "", match.group())
+        if len(digits) >= _MIN_PHONE_DIGITS:
+            redacted = redacted.replace(match.group(), "[REDACTED_PHONE]")
+
+    return redacted

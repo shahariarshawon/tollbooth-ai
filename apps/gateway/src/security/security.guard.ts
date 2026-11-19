@@ -28,7 +28,10 @@ export class SecurityGuard implements CanActivate {
     const text = extractMessageText(request.body);
     if (text.length === 0) return true;
 
-    const result = await this.security.check(text);
+    const traceparent = request.headers?.['traceparent'] as string | undefined;
+    const result = traceparent
+      ? await this.security.check(text, { requestId: request.id, traceparent })
+      : await this.security.check(text);
     if (result.blocked) {
       const types = result.issues.map((issue) => issue.type).join(', ') || 'content policy';
       logEvent(

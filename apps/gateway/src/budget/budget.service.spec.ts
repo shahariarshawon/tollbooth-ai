@@ -143,7 +143,9 @@ describe('BudgetService (Unit & Concurrency Resilience)', () => {
     });
 
     it('bypasses checks safely and returns null when GATEWAY_FAIL_OPEN is true', async () => {
-      const openPolicy = new RedisFailurePolicy({ GATEWAY_FAIL_OPEN: true } as unknown as AppConfig);
+      const openPolicy = new RedisFailurePolicy({
+        GATEWAY_FAIL_OPEN: true,
+      } as unknown as AppConfig);
       const openService = new BudgetService(
         redis as unknown as RedisService,
         openPolicy,

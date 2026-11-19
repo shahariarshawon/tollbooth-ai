@@ -6,11 +6,12 @@ import { TokenCounter } from '../tokens/token-counter.service';
 import { fromGeminiResponse, readGeminiError, toGeminiRequest } from './gemini.mapper';
 import { lookupModelInfo, modelIsKnown, PROVIDER_DISPLAY_NAMES } from './model-info';
 import { errorForStatus, postJson } from './provider-http';
-import { rejectStreaming, usageFromResult } from './provider-support';
+import { synthesizeChunkStream, usageFromResult } from './provider-support';
 import { withProviderRetry } from './provider-retry';
 import { ProviderError } from './provider.interface';
 import type {
   AIProvider,
+  ChatCompletionChunk,
   ChatCompletionRequest,
   ChatCompletionResult,
   ModelInfo,
@@ -58,8 +59,12 @@ export class GeminiProvider implements AIProvider {
     return withProviderRetry(() => this.attempt(request), { maxRetries: this.maxRetries });
   }
 
-  streamCompletion(): Promise<never> {
-    return rejectStreaming();
+  async *streamCompletion(
+    request: ChatCompletionRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<ChatCompletionChunk> {
+    const result = await this.chatCompletion(request);
+    yield* synthesizeChunkStream(result, signal);
   }
 
   private async attempt(request: ChatCompletionRequest): Promise<ChatCompletionResult> {

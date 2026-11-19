@@ -21,6 +21,28 @@ export interface ChatCompletionRequest {
   user?: string;
 }
 
+/** Provider-neutral streaming chunk. */
+export interface ChatCompletionChunkChoice {
+  index: number;
+  delta: {
+    role?: 'assistant';
+    content?: string | null;
+  };
+  finishReason: string | null;
+}
+
+export interface ChatCompletionChunk {
+  id: string;
+  created: number;
+  model: string;
+  choices: ChatCompletionChunkChoice[];
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 /** Provider-neutral response, what every provider must normalise to. */
 export interface ChatCompletionResult {
   id: string;
@@ -98,11 +120,13 @@ export interface AIProvider {
   chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult>;
 
   /**
-   * Streaming is not implemented yet (see "What is not done" in docs/architecture/provider-router.md).
-   * Every provider still exposes the method, so a caller gets one consistent, classified rejection
-   * (`ProviderError('bad_request', ...)`) instead of each adapter failing differently.
+   * Streams completion chunks in the OpenAI-compatible format.
+   * Throws ProviderError on failure.
    */
-  streamCompletion(request: ChatCompletionRequest): Promise<never>;
+  streamCompletion(
+    request: ChatCompletionRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<ChatCompletionChunk>;
 
   /** Static facts about a model (context window, output limit), or undefined for models it does not know. */
   getModelInfo(model: string): ModelInfo | undefined;

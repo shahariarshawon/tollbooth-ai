@@ -11,3 +11,8 @@ scrape_configs:
     static_configs:
       - targets: ['gateway:3000']
     metrics_path: /metrics
+
+  - job_name: tollbooth-ai-service
+    static_configs:
+      - targets: ['ai-service:8000']
+    metrics_path: /security/cache/metrics

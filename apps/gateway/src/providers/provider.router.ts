@@ -90,6 +90,11 @@ export class ProviderRouter implements OnModuleInit {
   }
 
   async resolve(modelName: string): Promise<ResolvedModel> {
+    const candidates = await this.resolveCandidates(modelName);
+    return candidates[0]!;
+  }
+
+  async resolveCandidates(modelName: string): Promise<ResolvedModel[]> {
     const canonicalName = normalizeModelIdentifier(modelName);
     const rows = await this.prisma.aiModel.findMany({
       where:
@@ -104,16 +109,16 @@ export class ProviderRouter implements OnModuleInit {
     const active = rows.filter((row) => row.isActive);
     if (active.length === 0) throw GatewayErrors.modelUnavailable(modelName);
 
-    // Default provider first; otherwise catalogue order. Trying the next one when a call fails is
-    // failover, which is a later feature.
+    // Default provider first; otherwise catalogue order.
     const ordered = [...active].sort(
       (a, b) => Number(this.isDefault(b)) - Number(this.isDefault(a)),
     );
 
+    const candidates: ResolvedModel[] = [];
     for (const row of ordered) {
       const provider = this.servingProvider(row);
       if (provider) {
-        return {
+        candidates.push({
           name: row.modelName,
           providerId: provider.id,
           providerType: provider.type,
@@ -124,10 +129,14 @@ export class ProviderRouter implements OnModuleInit {
             tier: tierOf(row.provider.configuration),
           },
           info: provider.getModelInfo(row.modelName),
-        };
+        });
       }
     }
-    throw new ProviderUnavailableException();
+
+    if (candidates.length === 0) {
+      throw new ProviderUnavailableException();
+    }
+    return candidates;
   }
 
   private isDefault(row: ModelRow): boolean {

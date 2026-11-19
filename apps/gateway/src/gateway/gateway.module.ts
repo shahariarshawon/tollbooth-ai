@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApiKeyModule } from '../api-key/api-key.module';
+import { CacheModule } from '../cache/cache.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { SecurityModule } from '../security/security.module';
 import { TokensModule } from '../tokens/tokens.module';
@@ -11,6 +12,7 @@ import { GatewayService } from './gateway.service';
 @Module({
   imports: [
     ApiKeyModule,
+    CacheModule,
     ProvidersModule,
     SecurityModule,
     UsageModule,

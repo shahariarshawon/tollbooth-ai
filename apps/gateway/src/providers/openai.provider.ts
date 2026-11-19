@@ -5,11 +5,12 @@ import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
 import { TokenCounter } from '../tokens/token-counter.service';
 import { lookupModelInfo, modelIsKnown, PROVIDER_DISPLAY_NAMES } from './model-info';
-import { rejectStreaming, usageFromResult } from './provider-support';
+import { usageFromResult } from './provider-support';
 import { withProviderRetry } from './provider-retry';
 import { ProviderError } from './provider.interface';
 import type {
   AIProvider,
+  ChatCompletionChunk,
   ChatCompletionRequest,
   ChatCompletionResult,
   ModelInfo,
@@ -62,8 +63,60 @@ export class OpenAIProvider implements AIProvider {
     return usageFromResult(this.tokens, request, result);
   }
 
-  streamCompletion(): Promise<never> {
-    return rejectStreaming();
+  async *streamCompletion(
+    request: ChatCompletionRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<ChatCompletionChunk> {
+    if (!this.client) throw new ProviderError('unavailable', 'OpenAI is not configured');
+
+    try {
+      const stream = await this.client.chat.completions.create(
+        {
+          model: request.model,
+          messages: request.messages,
+          stream: true,
+          ...(request.temperature !== undefined && { temperature: request.temperature }),
+          ...(request.topP !== undefined && { top_p: request.topP }),
+          ...(request.maxTokens !== undefined && { max_tokens: request.maxTokens }),
+          ...(request.stop !== undefined && { stop: request.stop }),
+          ...(request.presencePenalty !== undefined && {
+            presence_penalty: request.presencePenalty,
+          }),
+          ...(request.frequencyPenalty !== undefined && {
+            frequency_penalty: request.frequencyPenalty,
+          }),
+          ...(request.user !== undefined && { user: request.user }),
+        },
+        { signal },
+      );
+
+      for await (const chunk of stream) {
+        if (signal?.aborted) return;
+        yield {
+          id: chunk.id,
+          created: chunk.created,
+          model: chunk.model,
+          choices: chunk.choices.map((choice) => ({
+            index: choice.index,
+            delta: {
+              ...(choice.delta.role && { role: choice.delta.role as 'assistant' }),
+              ...(choice.delta.content !== undefined && { content: choice.delta.content }),
+            },
+            finishReason: choice.finish_reason ?? null,
+          })),
+          ...(chunk.usage && {
+            usage: {
+              promptTokens: chunk.usage.prompt_tokens,
+              completionTokens: chunk.usage.completion_tokens,
+              totalTokens: chunk.usage.total_tokens,
+            },
+          }),
+        };
+      }
+    } catch (error) {
+      if (signal?.aborted) return;
+      throw this.classify(error);
+    }
   }
 
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResult> {

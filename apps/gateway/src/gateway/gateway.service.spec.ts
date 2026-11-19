@@ -1,3 +1,4 @@
+import type { GatewayCacheService } from '../cache/gateway-cache.service';
 import { GatewayException } from '../common/errors/gateway.exception';
 import type { ApiKeyAuth } from '../common/types/gateway-request';
 import type { AppConfig } from '../config/config.module';
@@ -36,11 +37,17 @@ describe('GatewayService - Model Authorization Integration', () => {
       GATEWAY_MAX_TOKENS: 4096,
     };
 
+    const mockCache = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new GatewayService(
       mockRouter as unknown as ProviderRouter,
       mockUsage as unknown as UsageService,
       mockTokens as unknown as TokenCounter,
       mockTraffic as unknown as TrafficControlService,
+      mockCache as unknown as GatewayCacheService,
       mockConfig as unknown as AppConfig,
     );
   });
