@@ -370,14 +370,23 @@ describe('Authentication (e2e)', () => {
       expect(events).toHaveLength(1);
     });
 
-    it('does not let concurrent use of one token succeed twice', async () => {
+    it('does not let concurrent use of one token succeed twice and preserves winner session', async () => {
       const admin = await registerTenant(ctx, 'race');
       const results = await Promise.all(
         Array.from({ length: 4 }, () =>
           http(ctx).post('/auth/refresh').send({ refreshToken: admin.refreshToken }),
         ),
       );
-      expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+      const winners = results.filter((r) => r.status === 200);
+      expect(winners).toHaveLength(1);
+      const losers = results.filter((r) => r.status === 401);
+      expect(losers).toHaveLength(3);
+
+      // The winner's newly issued refresh token must remain valid and not be revoked by the losers
+      const winner = winners[0];
+      expect(winner).toBeDefined();
+      const winnerRefreshToken = (winner as NonNullable<typeof winner>).body.refreshToken;
+      await http(ctx).post('/auth/refresh').send({ refreshToken: winnerRefreshToken }).expect(200);
     });
 
     it('rejects unknown, expired and malformed refresh tokens', async () => {

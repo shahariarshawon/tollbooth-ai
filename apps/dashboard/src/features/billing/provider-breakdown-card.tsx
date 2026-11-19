@@ -46,10 +46,11 @@ export function ProviderBreakdownCard({ breakdown, totalUsage }: ProviderBreakdo
                       </span>
                       <div className="space-x-2">
                         <span className="text-muted-foreground">
-                          {item.requests.toLocaleString()} reqs ({item.tokens.toLocaleString()} tok)
+                          {(item.requests ?? 0).toLocaleString()} reqs (
+                          {(item.tokens ?? 0).toLocaleString()} tok)
                         </span>
                         <span className="font-bold text-foreground">
-                          ${item.cost.toFixed(4)} ({item.percentage}%)
+                          ${(item.cost ?? 0).toFixed(4)} ({item.percentage ?? 0}%)
                         </span>
                       </div>
                     </div>

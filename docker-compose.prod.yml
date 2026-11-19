@@ -138,6 +138,7 @@ services:
       GATEWAY_FAIL_OPEN: ${GATEWAY_FAIL_OPEN:-false}
       GATEWAY_CIRCUIT_FAILURE_THRESHOLD: ${GATEWAY_CIRCUIT_FAILURE_THRESHOLD:-5}
       GATEWAY_CIRCUIT_OPEN_MS: ${GATEWAY_CIRCUIT_OPEN_MS:-30000}
+      TRUST_PROXY_HOPS: '1'
     depends_on:
       migrate:
         condition: service_completed_successfully

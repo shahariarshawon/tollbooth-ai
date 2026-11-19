@@ -23,12 +23,22 @@ export function formatDate(iso: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? '-' : dateFormat.format(date);
 }
 
-export function initials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+export function initials(firstName?: string | null, lastName?: string | null): string {
+  const f = firstName?.trim() || '';
+  const l = lastName?.trim() || '';
+  if (f && l) return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase();
+  if (f) return f.charAt(0).toUpperCase();
+  if (l) return l.charAt(0).toUpperCase();
+  return 'U';
 }
 
-export function fullName(user: { firstName: string; lastName: string }): string {
-  return `${user.firstName} ${user.lastName}`.trim();
+export function fullName(user: {
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string;
+}): string {
+  const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+  return name || user.email || 'User';
 }
 
 /** "TENANT_ADMIN" -> "Tenant admin" */

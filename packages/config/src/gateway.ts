@@ -76,6 +76,15 @@ const gatewayObject = z.object({
     z.coerce.number().int().min(100).default(3_000),
   ),
   /**
+   * How many reverse proxies sit in front of this service and set X-Forwarded-For. 0 (default) ignores
+   * the header and uses the connection address. Set it only to the real number: a larger value lets a
+   * client choose its own address by sending the header itself.
+   */
+  TRUST_PROXY_HOPS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(0).max(5).default(0),
+  ),
+  /**
    * What the gateway does when the AI Security Service cannot be reached. false (default) rejects the
    * request with 503, because its content could not be checked; true lets it through unchecked, trading
    * that protection for availability. Mirrors GATEWAY_FAIL_OPEN's naming and default.

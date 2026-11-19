@@ -85,7 +85,7 @@ export function ApiKeysTable({ keys, onRotate, onRevoke }: ApiKeysTableProps) {
               {/* Permissions */}
               <TableCell>
                 <div className="flex flex-wrap gap-1">
-                  {key.permissions.map((permission) => (
+                  {(key.permissions ?? []).map((permission) => (
                     <Badge key={permission} variant="outline">
                       {permission}
                     </Badge>

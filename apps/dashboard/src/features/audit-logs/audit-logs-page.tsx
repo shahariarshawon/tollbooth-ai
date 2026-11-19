@@ -189,7 +189,7 @@ function AuditLogsContent() {
         <QueryBoundary
           query={auditQuery}
           loading={<TableSkeleton columns={6} rows={8} />}
-          isEmpty={(resp) => !resp || resp.logs.length === 0}
+          isEmpty={(resp) => !resp || !resp.logs || resp.logs.length === 0}
           empty={
             <EmptyState
               icon={Shield}

@@ -15,7 +15,7 @@ import { applySession, clearSession, COOKIE_NAMES } from '@/lib/server/session-c
  * the access token is missing or rejected it refreshes the session once and retries, so the client
  * never handles tokens.
  */
-async function forward(request: NextRequest, path: string[], accessToken?: string) {
+async function forward(request: NextRequest, path: string[], body?: string, accessToken?: string) {
   const headers: Record<string, string> = { ...clientIpHeaders(request) };
   const contentType = request.headers.get('content-type');
   if (contentType) headers['Content-Type'] = contentType;
@@ -23,11 +23,10 @@ async function forward(request: NextRequest, path: string[], accessToken?: strin
   if (tenantId) headers['X-Tenant-Id'] = tenantId;
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  const hasBody = !['GET', 'HEAD'].includes(request.method);
   return controlPlane(`/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`, {
     method: request.method,
     headers,
-    body: hasBody ? await request.text() : undefined,
+    body,
   });
 }
 
@@ -42,6 +41,9 @@ async function handle(
   if (request.method !== 'GET' && isCrossSite(request)) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
+
+  const hasBody = !['GET', 'HEAD'].includes(request.method);
+  const body = hasBody ? await request.text() : undefined;
 
   const refreshToken = request.cookies.get(COOKIE_NAMES.refresh)?.value;
   let accessToken = request.cookies.get(COOKIE_NAMES.access)?.value;
@@ -60,9 +62,9 @@ async function handle(
 
   let upstream: Response;
   try {
-    upstream = await forward(request, path, accessToken);
+    upstream = await forward(request, path, body, accessToken);
     if (upstream.status === 401 && !renewed && (await renew())) {
-      upstream = await forward(request, path, accessToken);
+      upstream = await forward(request, path, body, accessToken);
     }
   } catch {
     return NextResponse.json({ message: 'The service is unavailable right now' }, { status: 502 });

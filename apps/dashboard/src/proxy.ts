@@ -11,12 +11,16 @@ export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/dashboard') && !signedIn) {
-    const login = new URL('/login', request.url);
+    const login = request.nextUrl.clone();
+    login.pathname = '/login';
     login.searchParams.set('next', pathname);
     return NextResponse.redirect(login);
   }
   if ((pathname === '/login' || pathname === '/demo') && signedIn) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const dashboard = request.nextUrl.clone();
+    dashboard.pathname = '/dashboard';
+    dashboard.search = '';
+    return NextResponse.redirect(dashboard);
   }
   return NextResponse.next();
 }
