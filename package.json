@@ -5,10 +5,13 @@
   "description": "Multi-tenant LLM gateway and AI governance platform",
   "packageManager": "pnpm@10.17.1",
   "engines": {
-    "node": ">=22"
+    "node": "22.x",
+    "pnpm": ">=10"
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
+    "build:control-plane": "pnpm --filter @tollbooth/control-plane... build",
+    "start:control-plane": "pnpm --filter @tollbooth/control-plane start",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:db && pnpm typecheck:scripts",
     "test": "pnpm -r --if-present test",

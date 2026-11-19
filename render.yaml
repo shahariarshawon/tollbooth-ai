@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: tollbooth-control-plane
+    runtime: node
+    plan: standard
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @tollbooth/control-plane... build
+    startCommand: pnpm --filter @tollbooth/control-plane start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: DEMO_MODE
+        value: "false"
