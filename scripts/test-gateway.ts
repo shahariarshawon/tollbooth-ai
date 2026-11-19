@@ -9,6 +9,8 @@
  * database from `pnpm db:seed`), uses it, and revokes it again. The key exists only in this process.
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import axios from 'axios';
 import { createHash, randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
@@ -24,7 +26,14 @@ const { values } = parseArgs({
 });
 
 const baseUrl = String(values.url).replace(/\/$/, '');
-const prisma = new PrismaClient();
+const connectionString =
+  process.env['DATABASE_URL'] || 'postgresql://postgres@localhost:5432/tollbooth';
+const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes('supabase.com') ? { rejectUnauthorized: false } : undefined,
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 const DEV_KEY_NAME = 'Gateway test script';
 
 const line = (label: string, value: unknown) =>
@@ -163,4 +172,7 @@ main()
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

@@ -2,7 +2,14 @@
 CREATE EXTENSION IF NOT EXISTS "citext";
 
 -- CreateExtension
-CREATE EXTENSION IF NOT EXISTS "vector";
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS "vector";
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'vector extension is not available on this system, skipping';
+END
+$$;
 
 -- CreateEnum
 CREATE TYPE "TenantPlan" AS ENUM ('FREE', 'STARTUP', 'BUSINESS', 'ENTERPRISE');

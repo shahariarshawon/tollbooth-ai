@@ -25,7 +25,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (!upstream.ok) {
-    const response = NextResponse.json(await upstream.json().catch(() => ({})), {
+    const errorBody: unknown = await upstream.json().catch(() => null);
+    const data =
+      errorBody && typeof errorBody === 'object'
+        ? errorBody
+        : { message: upstream.status >= 500 ? 'Service temporarily unavailable' : 'Invalid email or password' };
+    const response = NextResponse.json(data, {
       status: upstream.status,
     });
     const retryAfter = upstream.headers.get('retry-after');

@@ -1,6 +1,15 @@
+import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+
+// Load .env if present
+try {
+  process.loadEnvFile?.(path.resolve(__dirname, '../../.env'));
+} catch {}
+try {
+  process.loadEnvFile?.(path.resolve(process.cwd(), '.env'));
+} catch {}
 
 /**
  * Database seeding, split by who may run it where. Each target is named explicitly:
@@ -22,6 +31,26 @@ const TARGETS: Record<string, () => Promise<Seeder>> = {
   demo: async () => (await import('./demo')).seedDemoData,
 };
 
+function createPgPool(connectionString: string): Pool {
+  const isSupabase = connectionString.includes('supabase.com');
+  if (isSupabase) {
+    try {
+      const url = new URL(connectionString);
+      url.searchParams.delete('sslmode');
+      return new Pool({
+        connectionString: url.toString(),
+        ssl: { rejectUnauthorized: false },
+      });
+    } catch {
+      return new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+      });
+    }
+  }
+  return new Pool({ connectionString });
+}
+
 async function main(): Promise<void> {
   const requested = process.argv.slice(2);
   const unknown = requested.filter((name) => !(name in TARGETS));
@@ -39,14 +68,13 @@ async function main(): Promise<void> {
   }
 
   const connectionString = process.env['DATABASE_URL'];
-  const pool = connectionString
-    ? new Pool({
-        connectionString,
-        ssl: connectionString.includes('supabase.com') ? { rejectUnauthorized: false } : undefined,
-      })
-    : undefined;
-  const adapter = pool ? new PrismaPg(pool) : undefined;
-  const prisma = adapter ? new PrismaClient({ adapter }) : new PrismaClient();
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set in the environment or .env file.');
+  }
+
+  const pool = createPgPool(connectionString);
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
   try {
     for (const name of requested) {
       const seed = await TARGETS[name]!();
