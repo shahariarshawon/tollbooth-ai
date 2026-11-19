@@ -13,6 +13,8 @@ export function usageFromResult(
   request: ChatCompletionRequest,
   result: ChatCompletionResult,
 ): TokenUsage {
+  const isEstimated =
+    result.usage?.promptTokens === undefined || result.usage?.completionTokens === undefined;
   const requestTokens =
     result.usage?.promptTokens ?? tokens.countMessages(request.model, request.messages);
   const responseTokens =
@@ -21,7 +23,12 @@ export function usageFromResult(
       (sum, choice) => sum + tokens.countText(request.model, choice.message.content ?? ''),
       0,
     );
-  return { requestTokens, responseTokens, totalTokens: requestTokens + responseTokens };
+  return {
+    requestTokens,
+    responseTokens,
+    totalTokens: requestTokens + responseTokens,
+    ...(isEstimated ? { isEstimatedTokens: true } : {}),
+  };
 }
 
 /**

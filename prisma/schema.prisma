@@ -124,6 +124,7 @@ model Tenant {
   teams         Team[]
   subscription  TenantSubscription?
   settings      SystemSetting[]
+  outboxEvents  OutboxEvent[]
 
   @@map("tenants")
 }
@@ -353,6 +354,61 @@ model AuditLog {
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([userId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Transactional Outbox, Idempotency & Dead-Letter (Phase 3)
+// ---------------------------------------------------------------------------
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model OutboxEvent {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String?      @db.Uuid
+  topic       String       @db.VarChar(100)
+  eventKey    String?      @db.VarChar(100)
+  eventType   String       @db.VarChar(100)
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  retryCount  Int          @default(0)
+  lastError   String?
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  publishedAt DateTime?    @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+  @@map("outbox_events")
+}
+
+model ProcessedEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId       String   @db.VarChar(100)
+  eventType     String   @db.VarChar(100)
+  consumerGroup String   @default("default") @db.VarChar(100)
+  processedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([eventId, consumerGroup])
+  @@map("processed_events")
+}
+
+model DeadLetterEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topic         String   @db.VarChar(100)
+  consumerGroup String?  @db.VarChar(100)
+  eventKey      String?  @db.VarChar(100)
+  payload       Json
+  error         String
+  retryCount    Int      @default(0)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([topic, createdAt])
+  @@map("dead_letter_events")
 }
 
 // ---------------------------------------------------------------------------

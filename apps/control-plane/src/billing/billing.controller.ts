@@ -21,6 +21,18 @@ export class BillingController {
     return this.billing.getSummary(tenantId);
   }
 
+  @Get('reconcile')
+  reconcile(
+    @CurrentTenantId() tenantId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.billing.reconcileUsage(tenantId, {
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+    });
+  }
+
   @Get('history')
   getHistory(
     @CurrentTenantId() tenantId: string,

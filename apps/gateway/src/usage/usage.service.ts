@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { LedgerTransactionType } from '@tollbooth/database';
 import { KAFKA_PROVIDER_TOPIC, KAFKA_USAGE_TOPIC, KafkaService } from '@tollbooth/kafka';
 import type { ProviderFailedEvent, UsageCompletedEvent } from '@tollbooth/kafka';
@@ -7,21 +7,20 @@ import { recordAiFailure, recordAiSuccess } from '../metrics/metrics';
 import type { RecordInput } from '../requests/request.service';
 import { RequestService } from '../requests/request.service';
 import type { TokenUsage } from '../requests/request.service';
-import { UsageRepository } from './usage.repository';
+import { OutboxService } from './outbox.service';
+import { UsageRepository, chargeAmount } from './usage.repository';
 
 /**
- * Pipeline step 9, in full: record what happened (`ai_requests`, via `RequestService`, unchanged from
- * earlier phases), what it cost (`ledger_entries`, Phase 7), and announce it on Kafka (Phase 8) for
- * whatever consumes it next (today, just the worker logging that it arrived).
+ * Pipeline step 9, in full: record what happened (`ai_requests`), what it cost (`ledger_entries`),
+ * and announce it reliably via Transactional Outbox (Phase 3) to Kafka.
  *
  * Token counting (`TokenCounter`) and cost calculation (`budget/cost-estimator.ts`) already happen
  * upstream, in the provider and in `TrafficControlService.complete`, the same provider-independent way
- * for every provider; this service only files the record of the outcome. It is the one thing
- * `GatewayService` calls after a request finishes, so it never has to remember to do all three.
+ * for every provider; this service files the record of the outcome.
  *
- * The Kafka publish is fire-and-forget (not awaited): it must never add latency or a new way to fail to
- * a request that has already been decided. `KafkaService.publish` already never throws, so this is safe
- * even unawaited; see `@tollbooth/kafka`.
+ * When the database transaction commits, the request record, the financial ledger charge, and the
+ * outbox event are guaranteed to be committed together atomically. If Kafka is unavailable, the
+ * event remains safely persisted in PostgreSQL and is swept by the outbox relay upon broker recovery.
  */
 @Injectable()
 export class UsageService {
@@ -32,41 +31,72 @@ export class UsageService {
     private readonly ledger: UsageRepository,
     private readonly kafka: KafkaService,
     private readonly alerts: AlertService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
-   * A successful call: the `ai_requests` row, then an `AI_USAGE` ledger entry for what it actually cost
-   * (0 on a free tier — recorded all the same, so free-tier usage leaves the same audit trail as paid
-   * usage; see Task 8), then a `usage.completed` event. The ledger entry is still written even if the
-   * `ai_requests` row failed to save, just without a `requestId` to link, because the money (or
-   * free-tier usage) still happened; the event carries that same (possibly absent) id.
+   * A successful call: records `ai_requests`, `ledger_entries`, and `outbox_events` atomically.
+   * If OutboxService is present, dispatches immediately; otherwise falls back to direct publish.
    */
   async recordSuccess(
-    input: RecordInput & { usage: TokenUsage; estimatedCostUsd: string },
+    input: RecordInput & {
+      usage: TokenUsage;
+      estimatedCostUsd: string;
+      correlationId?: string;
+      pricingDescription?: string;
+    },
   ): Promise<void> {
-    const requestId = await this.requests.recordSuccess(input);
-    await this.writeLedgerEntry({
-      tenantId: input.auth.tenantId,
-      requestId,
-      transactionType: 'AI_USAGE',
-      amountUsd: chargeAmount(input.estimatedCostUsd),
-      description: `${input.provider} ${input.model}`,
-    });
+    if (this.outbox && typeof this.ledger.recordSuccessTransaction === 'function') {
+      try {
+        const result = await this.ledger.recordSuccessTransaction({
+          auth: input.auth,
+          provider: input.provider,
+          model: input.model,
+          latencyMs: input.latencyMs,
+          usage: input.usage,
+          estimatedCostUsd: input.estimatedCostUsd,
+          correlationId: input.correlationId,
+          pricingDescription: input.pricingDescription,
+        });
+        void this.outbox.dispatchImmediately(
+          result.outboxEventId,
+          KAFKA_USAGE_TOPIC,
+          result.event,
+          input.auth.tenantId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to record transactional usage (tenantId=${input.auth.tenantId})`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    } else {
+      const requestId = await this.requests.recordSuccess(input);
+      await this.writeLedgerEntry({
+        tenantId: input.auth.tenantId,
+        requestId,
+        transactionType: 'AI_USAGE',
+        amountUsd: chargeAmount(input.estimatedCostUsd),
+        description: `${input.provider} ${input.model}`,
+      });
 
-    const event: UsageCompletedEvent = {
-      requestId: requestId ?? '',
-      tenantId: input.auth.tenantId,
-      projectId: input.auth.projectId,
-      provider: input.provider,
-      model: input.model,
-      requestTokens: input.usage.requestTokens,
-      responseTokens: input.usage.responseTokens,
-      totalTokens: input.usage.totalTokens,
-      estimatedCost: input.estimatedCostUsd,
-      latencyMs: Math.round(input.latencyMs),
-      timestamp: new Date().toISOString(),
-    };
-    void this.kafka.publish(KAFKA_USAGE_TOPIC, event, input.auth.tenantId);
+      const event: UsageCompletedEvent = {
+        requestId: requestId ?? '',
+        tenantId: input.auth.tenantId,
+        projectId: input.auth.projectId,
+        provider: input.provider,
+        model: input.model,
+        requestTokens: input.usage.requestTokens,
+        responseTokens: input.usage.responseTokens,
+        totalTokens: input.usage.totalTokens,
+        estimatedCost: input.estimatedCostUsd,
+        latencyMs: Math.round(input.latencyMs),
+        isEstimatedTokens: input.usage.isEstimatedTokens,
+        timestamp: new Date().toISOString(),
+      };
+      void this.kafka.publish(KAFKA_USAGE_TOPIC, event, input.auth.tenantId);
+    }
+
     recordAiSuccess(
       input.provider,
       input.model,
@@ -77,34 +107,71 @@ export class UsageService {
   }
 
   /**
-   * A failed call: recorded for the audit trail. Nothing is charged, because `TrafficControlService`
-   * already released whatever budget was held for it before this is called, so there is no ledger entry.
-   * A `provider.failed` event is published for a real provider failure (`errorKind` is not
-   * `bad_request`): that is what counts against the provider everywhere else in the system too (the
-   * circuit breaker), so it is the same definition of "failed" here.
+   * A failed call: recorded in `ai_requests` (and outbox if provider failure).
+   * Nothing is charged in ledger_entries.
    */
   async recordFailure(
-    input: RecordInput & { requestTokens: number; errorKind: string; errorMessage: string },
+    input: RecordInput & {
+      requestTokens: number;
+      errorKind: string;
+      errorMessage: string;
+      correlationId?: string;
+    },
   ): Promise<void> {
-    const requestId = await this.requests.recordFailure(input);
+    if (this.outbox && typeof this.ledger.recordFailureTransaction === 'function') {
+      try {
+        const result = await this.ledger.recordFailureTransaction({
+          auth: input.auth,
+          provider: input.provider,
+          model: input.model,
+          latencyMs: input.latencyMs,
+          requestTokens: input.requestTokens,
+          errorKind: input.errorKind,
+          errorMessage: input.errorMessage,
+          correlationId: input.correlationId,
+        });
+        if (result.outboxEventId && result.event) {
+          void this.outbox.dispatchImmediately(
+            result.outboxEventId,
+            KAFKA_PROVIDER_TOPIC,
+            result.event,
+            input.auth.tenantId,
+          );
+          void this.alerts.create(
+            input.auth.tenantId,
+            'PROVIDER_ERROR',
+            `${input.provider} ${input.model} failed: ${input.errorKind}.`,
+            'WARNING',
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to record failure transaction (tenantId=${input.auth.tenantId})`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    } else {
+      const requestId = await this.requests.recordFailure(input);
 
-    if (input.errorKind !== 'bad_request') {
-      const event: ProviderFailedEvent = {
-        requestId: requestId ?? '',
-        tenantId: input.auth.tenantId,
-        provider: input.provider,
-        model: input.model,
-        errorKind: input.errorKind,
-        timestamp: new Date().toISOString(),
-      };
-      void this.kafka.publish(KAFKA_PROVIDER_TOPIC, event, input.auth.tenantId);
-      void this.alerts.create(
-        input.auth.tenantId,
-        'PROVIDER_ERROR',
-        `${input.provider} ${input.model} failed: ${input.errorKind}.`,
-        'WARNING',
-      );
+      if (input.errorKind !== 'bad_request') {
+        const event: ProviderFailedEvent = {
+          requestId: requestId ?? '',
+          tenantId: input.auth.tenantId,
+          provider: input.provider,
+          model: input.model,
+          errorKind: input.errorKind,
+          timestamp: new Date().toISOString(),
+        };
+        void this.kafka.publish(KAFKA_PROVIDER_TOPIC, event, input.auth.tenantId);
+        void this.alerts.create(
+          input.auth.tenantId,
+          'PROVIDER_ERROR',
+          `${input.provider} ${input.model} failed: ${input.errorKind}.`,
+          'WARNING',
+        );
+      }
     }
+
     recordAiFailure(input.provider, input.model, input.errorKind);
   }
 
@@ -141,9 +208,4 @@ export class UsageService {
       );
     }
   }
-}
-
-/** `"0.00000500"` -> `"-0.00000500"`; `"0"` (and `"0.00000000"`) stay `"0"`, by the ledger's sign convention. */
-function chargeAmount(costUsd: string): string {
-  return Number(costUsd) === 0 ? '0' : `-${costUsd.replace(/^-/, '')}`;
 }

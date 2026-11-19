@@ -21,7 +21,8 @@
   "dependencies": {
     "@nestjs/common": "^11.2.7",
     "@tollbooth/config": "workspace:*",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "reflect-metadata": "^0.2.2"

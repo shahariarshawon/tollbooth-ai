@@ -111,6 +111,7 @@ export class GatewayService {
         errorKind: failure.kind,
         errorMessage:
           failure.kind === 'bad_request' ? `bad_request: ${failure.message}` : failure.kind,
+        correlationId: context.requestId,
       });
       throw failure.kind === 'bad_request'
         ? GatewayErrors.invalidRequest(
@@ -129,6 +130,11 @@ export class GatewayService {
     });
     // Micro-dollars to dollars, as a decimal string: exact, and 0 on a free tier.
     const estimatedCostUsd = (costMicroUsd / 1_000_000).toFixed(8);
+    const pricingDescription =
+      model.prices.tier === 'free'
+        ? '(free tier)'
+        : `(${usage.requestTokens}in @ $${model.prices.input}/M, ${usage.responseTokens}out @ $${model.prices.output}/M)`;
+
     await this.usage.recordSuccess({
       auth: context.auth,
       provider: model.providerType,
@@ -136,6 +142,8 @@ export class GatewayService {
       latencyMs,
       usage,
       estimatedCostUsd,
+      correlationId: context.requestId,
+      pricingDescription,
     });
 
     return this.toResponse(result, usage, estimatedCostUsd);

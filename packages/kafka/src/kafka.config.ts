@@ -9,6 +9,10 @@ export const KAFKA_USAGE_TOPIC = 'usage.completed';
 /** A provider call failed in a way that counts against it (not the caller's own bad request). */
 export const KAFKA_PROVIDER_TOPIC = 'provider.failed';
 
+/** Dead-letter queues for events whose processing repeatedly failed. */
+export const KAFKA_USAGE_DLQ_TOPIC = 'usage.completed.dlq';
+export const KAFKA_PROVIDER_DLQ_TOPIC = 'provider.failed.dlq';
+
 /**
  * One consumer group per topic, so scaling to several worker instances splits that topic's partitions
  * between them (instead of every instance seeing every message), without coupling the two topics'

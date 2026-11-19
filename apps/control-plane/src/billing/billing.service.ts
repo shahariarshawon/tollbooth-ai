@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, TenantPlan } from '@tollbooth/database';
+import {
+  PrismaService,
+  TenantPlan,
+  reconcileTenantUsage,
+  type ReconciliationReport,
+} from '@tollbooth/database';
 import { AuditAction } from '../audit/audit-actions';
 import { AuditService } from '../audit/audit.service';
 import type {
@@ -332,5 +337,21 @@ export class BillingService {
     });
 
     return updated;
+  }
+
+  async reconcileUsage(
+    tenantId: string,
+    options?: { from?: Date; to?: Date },
+  ): Promise<ReconciliationReport> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return reconcileTenantUsage(this.prisma, tenantId, {
+      fromDate: options?.from,
+      toDate: options?.to,
+    });
   }
 }

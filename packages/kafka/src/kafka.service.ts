@@ -17,6 +17,23 @@ export interface KafkaModuleOptions {
   maxMessageRetries?: number;
 }
 
+export interface SubscribeOptions {
+  /** Dead-letter topic to route messages that fail all retries. */
+  dlqTopic?: string;
+  /** Custom handler for permanently failed messages. */
+  onDeadLetter?: (failedMessage: DeadLetterMessage) => Promise<void>;
+}
+
+export interface DeadLetterMessage {
+  originalTopic: string;
+  consumerGroup: string;
+  key?: string;
+  value: string;
+  error: string;
+  retryCount: number;
+  timestamp: string;
+}
+
 export const KAFKA_MODULE_OPTIONS = Symbol('KAFKA_MODULE_OPTIONS');
 
 /**
@@ -108,6 +125,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     topic: string,
     groupId: string,
     onMessage: (payload: T) => Promise<void>,
+    options?: SubscribeOptions,
   ): Promise<void> {
     const consumer = this.kafka.consumer({ groupId });
     try {
@@ -124,9 +142,32 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
               await onMessage(payload);
             }, this.maxMessageRetries);
           } catch (error) {
-            // Retries exhausted (or the message was not valid JSON, which no retry would fix): log and
-            // move on, rather than leave the partition stuck behind one message forever.
-            this.logger.error(`Giving up on a message from "${topic}": ${errorMessage(error)}`);
+            // Retries exhausted (or the message was not valid JSON, which no retry would fix):
+            // Log and route to dead-letter queue if configured, rather than block the partition.
+            const errStr = errorMessage(error);
+            this.logger.error(`Giving up on a message from "${topic}": ${errStr}`);
+
+            const dlqPayload: DeadLetterMessage = {
+              originalTopic: topic,
+              consumerGroup: groupId,
+              key: message.key ? message.key.toString('utf8') : undefined,
+              value: message.value.toString('utf8'),
+              error: errStr,
+              retryCount: this.maxMessageRetries,
+              timestamp: new Date().toISOString(),
+            };
+
+            if (options?.onDeadLetter) {
+              try {
+                await options.onDeadLetter(dlqPayload);
+              } catch (dlqErr) {
+                this.logger.error(`Failed to handle DLQ message: ${errorMessage(dlqErr)}`);
+              }
+            }
+
+            if (options?.dlqTopic && this.producerReady) {
+              await this.publish(options.dlqTopic, dlqPayload, dlqPayload.key);
+            }
           }
         },
       });

@@ -41,6 +41,8 @@ export interface TokenUsage {
   requestTokens: number;
   responseTokens: number;
   totalTokens: number;
+  /** Whether prompt or response tokens were estimated by gateway tokenizer rather than provider metadata. */
+  isEstimatedTokens?: boolean;
 }
 
 /** What the gateway may know about a model without asking the provider. Prices are not here: they live in the database. */
