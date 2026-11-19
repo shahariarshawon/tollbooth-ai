@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "prisma generate --schema ../../prisma/schema.prisma && tsc -p tsconfig.build.json",
+    "build": "prisma generate --config ../../prisma.config.ts --schema ../../prisma/schema.prisma && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest"
   },
@@ -19,11 +19,14 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "pg": "^8.23.1",
+    "prisma": "^7.10.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "prisma": "^7.10.1"
+    "@types/pg": "^8.23.1"
   }
 }
