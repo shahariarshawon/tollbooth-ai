@@ -26,6 +26,8 @@ interface FieldProps {
 
 /** Label, control, hint and validation message laid out the same way in every form. */
 function Field({ label, htmlFor, error, hint, required, children, className }: FieldProps) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
+  const hintId = htmlFor ? `${htmlFor}-hint` : undefined;
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={htmlFor}>
@@ -37,9 +39,13 @@ function Field({ label, htmlFor, error, hint, required, children, className }: F
         )}
       </Label>
       {children}
-      {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && !error && (
+        <p id={hintId} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
       {error && (
-        <p role="alert" className="text-xs text-destructive">
+        <p id={errorId} role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}

@@ -21,7 +21,12 @@ export function isCrossSite(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   if (!origin) return false;
   try {
-    return new URL(origin).host !== request.headers.get('host');
+    const originUrl = new URL(origin);
+    const hostHeader = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+    if (!hostHeader) return false;
+    if (originUrl.host === hostHeader) return false;
+    const requestHostname = hostHeader.split(':')[0];
+    return originUrl.hostname !== requestHostname;
   } catch {
     return true;
   }

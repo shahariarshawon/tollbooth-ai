@@ -52,7 +52,8 @@ export function ProviderHealthCard({ providers }: { providers: ProviderStatusRow
         ) : (
           <ul className="flex flex-col divide-y divide-border">
             {providers.map((provider) => {
-              const { label, icon: Icon, variant } = HEALTH[provider.health];
+              const healthInfo = HEALTH[provider.health] ?? HEALTH.IDLE;
+              const { label, icon: Icon, variant } = healthInfo;
               return (
                 <li
                   key={provider.id}

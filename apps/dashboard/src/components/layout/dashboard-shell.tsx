@@ -40,36 +40,40 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   if (status !== 'authenticated') return <ShellSkeleton />;
 
   return (
-    <div className="min-h-dvh">
-      <DemoBanner />
-      <Navbar onMenuClick={() => setNavOpen(true)}>
-        <TenantScopePicker className="hidden w-44 md:block" />
-        <NotificationBell />
-        <UserMenu />
-      </Navbar>
+    <div className="flex min-h-dvh flex-col">
+      <div className="sticky top-0 z-40 bg-background">
+        <DemoBanner />
+        <Navbar onMenuClick={() => setNavOpen(true)}>
+          <TenantScopePicker className="hidden w-44 md:block" />
+          <NotificationBell />
+          <UserMenu />
+        </Navbar>
+      </div>
 
-      {/* Desktop: fixed sidebar. Below lg the same navigation opens as the drawer below. */}
-      <aside className="fixed bottom-0 left-0 top-14 hidden w-60 overflow-y-auto border-r border-border bg-card lg:block">
-        <AppSidebar />
-      </aside>
+      <div className="flex flex-1">
+        {/* Desktop: sticky sidebar. Below lg the same navigation opens as the drawer below. */}
+        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-60 shrink-0 overflow-y-auto border-r border-border bg-card lg:block">
+          <AppSidebar />
+        </aside>
 
-      <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent>
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SheetDescription className="sr-only">Main navigation</SheetDescription>
-          <div className="flex h-14 items-center border-b border-border px-4">
-            <Logo />
-          </div>
-          <div className="flex flex-col gap-3 overflow-y-auto">
-            <TenantScopePicker className="mx-3 mt-3 w-auto md:hidden" />
-            <AppSidebar onNavigate={() => setNavOpen(false)} />
-          </div>
-        </SheetContent>
-      </Sheet>
+        <Sheet open={navOpen} onOpenChange={setNavOpen}>
+          <SheetContent>
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">Main navigation</SheetDescription>
+            <div className="flex h-14 items-center border-b border-border px-4">
+              <Logo />
+            </div>
+            <div className="flex flex-col gap-3 overflow-y-auto">
+              <TenantScopePicker className="mx-3 mt-3 w-auto md:hidden" />
+              <AppSidebar onNavigate={() => setNavOpen(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
-      <main className="lg:pl-60">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">{children}</div>
-      </main>
+        <main className="flex-1 overflow-x-hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

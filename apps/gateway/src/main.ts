@@ -10,6 +10,7 @@ async function bootstrap(): Promise<void> {
 
   // The JSON body parser is registered in configureApp so its size limit can be set.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  if (config.TRUST_PROXY_HOPS > 0) app.set('trust proxy', config.TRUST_PROXY_HOPS);
   configureApp(app);
   app.enableShutdownHooks();
   await app.listen(config.PORT, '0.0.0.0');

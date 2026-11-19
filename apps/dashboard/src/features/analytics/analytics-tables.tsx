@@ -43,7 +43,7 @@ function TableCard({
 }
 
 export function TopModelsTable({ models }: { models: ModelUsageRow[] }) {
-  const top = models.slice(0, 5);
+  const top = (models ?? []).slice(0, 5);
   return (
     <TableCard title="Top models" description="By request volume" isEmpty={top.length === 0}>
       <TableHeader>

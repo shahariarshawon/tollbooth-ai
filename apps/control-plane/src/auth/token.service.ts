@@ -118,7 +118,7 @@ export class TokenService {
     }
 
     const refreshToken = await this.prisma.$transaction(async (tx) => {
-      // Only one concurrent caller can flip revokedAt from null; the loser is treated as a replay.
+      // Only one concurrent caller can flip revokedAt from null; concurrent losers fail the claim.
       const claimed = await tx.refreshToken.updateMany({
         where: { id: stored.id, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -128,7 +128,11 @@ export class TokenService {
       const expiresAt = user.tenant?.isDemo ? stored.expiresAt : undefined;
       return this.issueRefreshToken(user.id, stored.familyId, tx, expiresAt);
     });
-    if (!refreshToken) return this.rejectReuse(stored, ipAddress);
+    if (!refreshToken) {
+      // A concurrent request already rotated this token in the exact same instant.
+      // Reject this concurrent caller with 401 without destroying the entire session family.
+      throw this.invalid();
+    }
 
     return { user: toSessionUser(user), refreshToken };
   }
