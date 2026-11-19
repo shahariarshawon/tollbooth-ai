@@ -17,6 +17,7 @@ import type { TokenUsage } from '../providers/provider.interface';
 import { TokenCounter } from '../tokens/token-counter.service';
 import { TrafficControlService } from '../traffic/traffic-control.service';
 import { UsageService } from '../usage/usage.service';
+import { isModelPermitted } from './model-authorization';
 
 export interface PipelineContext {
   requestId: string;
@@ -64,24 +65,16 @@ export class GatewayService {
       );
     }
 
-    const model = await this.router.resolve(dto.model);
-
     const allowed = context.auth.allowedModels;
-    if (allowed && allowed.length > 0) {
-      const match = allowed.some(
-        (m) =>
-          dto.model.toLowerCase() === m.toLowerCase() ||
-          dto.model.toLowerCase().includes(m.toLowerCase()) ||
-          m.toLowerCase().includes(dto.model.toLowerCase()),
+    if (!isModelPermitted(dto.model, allowed)) {
+      throw GatewayErrors.invalidRequest(
+        `Model '${dto.model}' is not permitted for your team. Allowed models: ${allowed!.join(', ')}`,
+        'model',
+        'model_not_allowed',
       );
-      if (!match) {
-        throw GatewayErrors.invalidRequest(
-          `Model '${dto.model}' is not permitted for your team. Allowed models: ${allowed.join(', ')}`,
-          'model',
-          'model_not_allowed',
-        );
-      }
     }
+
+    const model = await this.router.resolve(dto.model);
 
     const request = this.toProviderRequest(dto);
     // Kept in case the call fails: a failed request still tells us how much the caller sent. This is

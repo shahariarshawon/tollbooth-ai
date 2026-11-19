@@ -38,7 +38,7 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
       <Card className="relative overflow-hidden">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Current Usage</span>
+            <span className="text-sm font-medium text-muted-foreground">Estimated AI Usage</span>
             <div className="rounded-md bg-primary/10 p-2 text-primary">
               <DollarSign className="size-4" />
             </div>
@@ -46,7 +46,7 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
           <div className="mt-3">
             <div className="text-2xl font-bold">{formatCurrency(summary.currentUsage)}</div>
             <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-              <span>Limit: {formatCurrency(summary.monthlyLimit)}</span>
+              <span>Guardrail: {formatCurrency(summary.monthlyLimit)}</span>
               <span className={isNearLimit ? 'font-semibold text-destructive' : 'font-medium'}>
                 {percentUsed}% spent
               </span>
@@ -68,7 +68,9 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Remaining Budget</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Remaining Budget Guardrail
+            </span>
             <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
               <Coins className="size-4" />
             </div>
@@ -77,7 +79,9 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(summary.remainingBudget)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Available before monthly hard cap</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Available buffer before monthly hard cap
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -86,7 +90,9 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Estimated Month-End</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Projected Month-End Spend
+            </span>
             <div className="rounded-md bg-amber-500/10 p-2 text-amber-500">
               <TrendingUp className="size-4" />
             </div>
@@ -94,7 +100,7 @@ export function BillingOverviewCards({ summary }: BillingOverviewCardsProps) {
           <div className="mt-3">
             <div className="text-2xl font-bold">{formatCurrency(summary.estimatedCost)}</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Projected based on current run rate
+              Projected based on current run rate against upstream models
             </p>
           </div>
         </CardContent>

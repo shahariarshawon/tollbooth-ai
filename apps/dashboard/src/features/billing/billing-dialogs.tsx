@@ -31,7 +31,7 @@ export function ChangePlanDialog({ currentPlanCode, onClose }: ChangePlanDialogP
   const handleSave = async () => {
     try {
       await assignSubscription.mutateAsync({ planCode: selectedCode });
-      toast.success(`Successfully switched to ${selectedCode} plan`);
+      toast.success(`Successfully switched to ${selectedCode} plan tier`);
       onClose();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -42,9 +42,10 @@ export function ChangePlanDialog({ currentPlanCode, onClose }: ChangePlanDialogP
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Change Subscription Plan</DialogTitle>
+          <DialogTitle>Change Workspace Plan Tier</DialogTitle>
           <DialogDescription>
-            Choose a plan that fits your organization's LLM governance and throughput requirements.
+            Select a tier to configure rate limits, token throughput, and default spending caps.
+            (Internal quota allocation only — no external credit card transaction).
           </DialogDescription>
         </DialogHeader>
 
@@ -66,7 +67,7 @@ export function ChangePlanDialog({ currentPlanCode, onClose }: ChangePlanDialogP
                     <h4 className="font-semibold text-sm">{p.name}</h4>
                     <span className="text-xl font-bold text-foreground">
                       ${p.monthlyPrice}
-                      <span className="text-xs font-normal text-muted-foreground">/mo</span>
+                      <span className="text-xs font-normal text-muted-foreground">/mo tier</span>
                     </span>
                   </div>
                   {isSelected && (
@@ -79,7 +80,7 @@ export function ChangePlanDialog({ currentPlanCode, onClose }: ChangePlanDialogP
                 <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{p.description}</p>
 
                 <div className="mt-3 pt-3 border-t text-[11px] space-y-1 text-muted-foreground">
-                  <div>Default Limit: ${p.monthlyBudgetLimit}/mo</div>
+                  <div>Budget Guardrail: ${p.monthlyBudgetLimit}/mo</div>
                   <div>Rate Limit: {p.requestsPerMinute} RPM</div>
                 </div>
               </div>
@@ -96,7 +97,7 @@ export function ChangePlanDialog({ currentPlanCode, onClose }: ChangePlanDialogP
             loading={assignSubscription.isPending}
             disabled={selectedCode === currentPlanCode}
           >
-            Confirm Plan Change
+            Update Workspace Tier
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -128,7 +129,7 @@ export function AdjustLimitsDialog({ currentMonthlyLimit, onClose }: AdjustLimit
         monthlyBudgetLimit: parsedMonthly,
         dailyBudgetLimit: isNaN(parsedDaily) ? undefined : parsedDaily,
       });
-      toast.success('Budget limits updated successfully');
+      toast.success('Spending guardrails updated successfully');
       onClose();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -140,14 +141,15 @@ export function AdjustLimitsDialog({ currentMonthlyLimit, onClose }: AdjustLimit
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSave}>
           <DialogHeader>
-            <DialogTitle>Adjust Spending Limits</DialogTitle>
+            <DialogTitle>Adjust Spending Guardrails</DialogTitle>
             <DialogDescription>
-              Configure monthly and daily budget caps to prevent unexpected AI spend.
+              Configure monthly and daily budget caps to enforce proactive upstream LLM cost
+              control.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <Field label="Monthly Budget Limit ($)" htmlFor="monthlyLimit">
+            <Field label="Monthly Budget Guardrail ($)" htmlFor="monthlyLimit">
               <Input
                 id="monthlyLimit"
                 type="number"
@@ -169,6 +171,11 @@ export function AdjustLimitsDialog({ currentMonthlyLimit, onClose }: AdjustLimit
                 onChange={(e) => setDailyLimit(e.target.value)}
               />
             </Field>
+
+            <p className="text-[11px] text-muted-foreground">
+              Requests exceeding these caps are paused or rejected with an HTTP 429 quota error
+              before reaching upstream model providers.
+            </p>
           </div>
 
           <DialogFooter>
@@ -176,7 +183,7 @@ export function AdjustLimitsDialog({ currentMonthlyLimit, onClose }: AdjustLimit
               Cancel
             </Button>
             <Button type="submit" loading={updateLimits.isPending}>
-              Save Limits
+              Save Spending Guardrails
             </Button>
           </DialogFooter>
         </form>

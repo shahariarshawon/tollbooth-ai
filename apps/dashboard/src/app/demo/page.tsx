@@ -43,16 +43,39 @@ export default function DemoPage() {
               <StartDemoButton />
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              You can still{' '}
-              <Link
-                href="/login"
-                className="font-medium text-foreground underline underline-offset-4"
-              >
-                sign in
-              </Link>{' '}
-              with an account, or read how the system works on the home page.
-            </p>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                The live interactive demo workspace requires a connected control-plane backend
+                running with{' '}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
+                  DEMO_MODE=true
+                </code>
+                .
+              </p>
+              <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-2">
+                <p className="font-semibold text-foreground">To run the demo workspace locally:</p>
+                <div className="space-y-1 font-mono">
+                  <p>1. Seed reference catalogue and synthetic demo data:</p>
+                  <pre className="overflow-x-auto rounded bg-background p-2 text-foreground">
+                    pnpm db:seed:demo
+                  </pre>
+                  <p>2. Set environment variables in your deployment:</p>
+                  <pre className="overflow-x-auto rounded bg-background p-2 text-foreground">
+                    DEMO_MODE=true&#10;CONTROL_PLANE_URL=http://localhost:3001
+                  </pre>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                You can also{' '}
+                <Link
+                  href="/login"
+                  className="font-medium text-foreground underline underline-offset-4"
+                >
+                  sign in
+                </Link>{' '}
+                with an account, or read how the system works on the home page.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
