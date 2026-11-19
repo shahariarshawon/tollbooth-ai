@@ -12,14 +12,21 @@ export function DemoBanner() {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-border bg-warning/15 px-4 py-2 text-sm"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs sm:px-6 dark:bg-amber-950/30"
     >
-      <FlaskConical className="size-4 shrink-0" aria-hidden />
-      <span>
-        <strong className="font-medium">Demo workspace.</strong> Read-only, with generated sample
-        data. The session ends automatically.
-      </span>
-      <Button variant="outline" size="sm" onClick={() => void logout()}>
+      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+        <FlaskConical className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+        <span>
+          <strong className="font-semibold">Demo workspace.</strong> Read-only, with generated sample
+          data. The session ends automatically.
+        </span>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => void logout()}
+        className="h-7 text-xs border-amber-600/30 bg-transparent hover:bg-amber-100 dark:hover:bg-amber-900/40"
+      >
         Exit demo
       </Button>
     </div>

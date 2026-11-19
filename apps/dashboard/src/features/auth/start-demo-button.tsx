@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/services/api-error';
 import { useAuth } from './auth-provider';
@@ -39,11 +40,20 @@ export function StartDemoButton() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Button onClick={() => void onClick()} loading={starting} size="lg">
+      <Button
+        onClick={() => void onClick()}
+        loading={starting}
+        size="lg"
+        className="w-full bg-blue-600 font-semibold text-white shadow-md shadow-blue-600/20 transition-all hover:bg-blue-500"
+      >
+        <Sparkles className="size-4 mr-1 text-white" aria-hidden />
         Explore Demo Workspace
       </Button>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+        >
           {error}
         </p>
       )}

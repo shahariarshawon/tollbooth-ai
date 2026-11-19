@@ -30,13 +30,21 @@ function Sidebar({ items, pathname, onNavigate, className }: SidebarProps) {
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               active
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                ? 'bg-blue-50 text-blue-700 font-semibold shadow-xs dark:bg-blue-950/40 dark:text-blue-300'
+                : 'text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800/60',
             )}
           >
-            <Icon className="size-4 shrink-0" aria-hidden />
+            <Icon
+              className={cn(
+                'size-4 shrink-0 transition-colors',
+                active
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-400 group-hover:text-foreground dark:text-slate-500',
+              )}
+              aria-hidden
+            />
             {label}
           </Link>
         );
