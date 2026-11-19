@@ -9,6 +9,7 @@ import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/config.module';
 import { AI_PROVIDERS } from './provider.interface';
 import type { AIProvider, ModelInfo, ProviderId } from './provider.interface';
+import { normalizeModelIdentifier } from '../gateway/model-authorization';
 
 const MODEL_SELECT = {
   id: true,
@@ -89,8 +90,12 @@ export class ProviderRouter implements OnModuleInit {
   }
 
   async resolve(modelName: string): Promise<ResolvedModel> {
+    const canonicalName = normalizeModelIdentifier(modelName);
     const rows = await this.prisma.aiModel.findMany({
-      where: { modelName },
+      where:
+        canonicalName === modelName
+          ? { modelName }
+          : { OR: [{ modelName }, { modelName: canonicalName }] },
       select: MODEL_SELECT,
       orderBy: { createdAt: 'asc' },
     });

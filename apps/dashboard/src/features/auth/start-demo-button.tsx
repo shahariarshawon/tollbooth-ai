@@ -11,7 +11,10 @@ function messageFor(error: unknown): string {
     if (error.status === 429)
       return 'Too many demo sessions right now. Please try again in a few minutes.';
     if (error.status === 404) return 'The demo is not enabled on this deployment.';
-    if (error.status === 503) return 'The demo workspace is not available right now.';
+    if (error.status === 503)
+      return 'The demo workspace is not set up in the database. Run "pnpm db:seed:demo" to initialize sample data.';
+    if (error.status === 502)
+      return 'The backend control plane is currently unreachable (502). Please verify the backend service is running.';
   }
   return 'Could not start the demo. Please try again.';
 }

@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/states';
 import { AccessDenied, Can } from '@/features/auth/can';
 import { usePermission } from '@/hooks/use-permission';
+import { useAuth } from '@/features/auth/auth-provider';
 import { AdjustLimitsDialog, ChangePlanDialog } from './billing-dialogs';
 import { BillingHistoryTable } from './billing-history-table';
 import { BillingOverviewCards } from './billing-overview-cards';
@@ -35,6 +36,7 @@ function BillingSkeleton() {
 
 function BillingContent() {
   const canManage = usePermission(Permission.MANAGE_BILLING);
+  const { user } = useAuth();
   const summaryQuery = useBillingSummary();
   const [historyPage, setHistoryPage] = React.useState(1);
   const historyQuery = useBillingHistory(historyPage, 10);
@@ -43,9 +45,20 @@ function BillingContent() {
   return (
     <>
       <PageHeader
-        title="Billing & Cost Control"
-        description="Monitor tenant LLM usage spend, configure billing plans, and set proactive budget caps."
+        title="Usage & Budget Controls"
+        description="Monitor upstream LLM consumption, manage workspace quota tiers, and enforce proactive spending limits."
       />
+
+      {user?.isDemo && (
+        <div
+          role="status"
+          className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300"
+        >
+          <strong className="font-semibold">Synthetic Demo Workspace:</strong> The billing summary,
+          projected spend, and financial ledger items below are simulated for demonstration. Plan
+          changes and limit modifications are disabled in the read-only demo.
+        </div>
+      )}
 
       <QueryBoundary query={summaryQuery} loading={<BillingSkeleton />}>
         {(summary) => (

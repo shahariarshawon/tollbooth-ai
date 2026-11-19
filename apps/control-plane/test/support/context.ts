@@ -137,14 +137,37 @@ export const bearer = (account: Pick<Account, 'accessToken'>) => ({
 
 export const asTenant = (tenantId: string) => ({ 'X-Tenant-Id': tenantId });
 
-/** Removes everything the suite created. Audit rows are RESTRICTed by design, so they go first. */
+/** Removes everything the suite created. Audit and financial rows are RESTRICTed by design, so they go first. */
 export async function destroyTestContext(ctx: TestContext): Promise<void> {
   const { prisma } = ctx;
-  await prisma.auditLog.deleteMany({
-    where: { OR: [{ tenantId: { in: ctx.tenantIds } }, { userId: { in: ctx.userIds } }] },
-  });
-  await prisma.$executeRaw`DELETE FROM audit_logs WHERE "tenantId" IS NULL AND metadata->>'email' LIKE '%@e2e.test'`;
-  await prisma.tenant.deleteMany({ where: { id: { in: ctx.tenantIds } } });
-  await prisma.user.deleteMany({ where: { id: { in: ctx.userIds } } });
-  await ctx.app.close();
+  try {
+    if (ctx.tenantIds.length > 0) {
+      await prisma.ledgerEntry.deleteMany({
+        where: { tenantId: { in: ctx.tenantIds } },
+      });
+      await prisma.usageEvent.deleteMany({
+        where: { tenantId: { in: ctx.tenantIds } },
+      });
+      await prisma.aiRequest.deleteMany({
+        where: { tenantId: { in: ctx.tenantIds } },
+      });
+    }
+    await prisma.auditLog.deleteMany({
+      where: {
+        OR: [
+          ...(ctx.tenantIds.length > 0 ? [{ tenantId: { in: ctx.tenantIds } }] : []),
+          ...(ctx.userIds.length > 0 ? [{ userId: { in: ctx.userIds } }] : []),
+        ],
+      },
+    });
+    await prisma.$executeRaw`DELETE FROM audit_logs WHERE "tenantId" IS NULL AND metadata->>'email' LIKE '%@e2e.test'`;
+    if (ctx.tenantIds.length > 0) {
+      await prisma.tenant.deleteMany({ where: { id: { in: ctx.tenantIds } } });
+    }
+    if (ctx.userIds.length > 0) {
+      await prisma.user.deleteMany({ where: { id: { in: ctx.userIds } } });
+    }
+  } finally {
+    await ctx.app.close();
+  }
 }

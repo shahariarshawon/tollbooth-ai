@@ -51,6 +51,7 @@ jobs:
       - run: pnpm build
       - run: pnpm db:validate
       - run: pnpm db:deploy
+      - run: pnpm db:seed:reference
       - run: pnpm --filter @tollbooth/control-plane test:e2e
         env:
           JWT_SECRET: ci-only-secret-that-is-at-least-32-characters

@@ -7,23 +7,44 @@ with a revocable API key. The gateway decides who may call what, how often, and 
 a request reaches Gemini, OpenAI or Anthropic, and records every call. A dashboard shows usage, spend,
 provider health and an audit log per tenant.
 
-## Live demo
+## Public and Local Demo
 
-There is no hosted instance tied to this repository yet. The demo runs locally in a few minutes, with
-generated sample data and no sign-up: a read-only workspace entered with one click, no password.
+The project features an anonymous, passwordless read-only demo mode designed to let recruiters and evaluators explore product functionality with synthetic data:
+
+- **Public Website:** [https://tollbooth-ai.vercel.app/](https://tollbooth-ai.vercel.app/)
+- **Live Demo Route:** `/demo` creates a short-lived, rate-limited demo session in a dedicated, flagged demo tenant (`isDemo: true`).
+- **Deployment Requirements:** The demo requires `DEMO_MODE=true`, `CONTROL_PLANE_URL` configured to a reachable backend instance, and synthetic demo seed data (`pnpm db:seed:demo`). If the control plane is unreachable on a frontend-only deployment, the `/demo` page provides fallback guidance and setup instructions.
+- **Security Guardrails:** Demo sessions are strictly read-only. Server-side `DemoPolicyGuard` rejects all state-mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`) with HTTP 403 Forbidden.
+
+To run the full interactive demo locally:
 
 ```bash
 pnpm install && pnpm --filter "./packages/*" build
 cp .env.example .env                 # set JWT_SECRET; set DEMO_MODE=true
-echo "DEMO_MODE=true" > apps/dashboard/.env.local
-pnpm infra:up && pnpm db:migrate && pnpm db:seed:demo
+pnpm infra:up                        # Postgres, Redis, Kafka
+pnpm db:deploy                       # apply committed migrations
+pnpm db:seed:demo                    # seed reference catalogue and synthetic demo data
 pnpm --filter @tollbooth/control-plane dev &
-pnpm --filter @tollbooth/dashboard dev      # http://localhost:3002, then "Explore Live Demo"
+pnpm --filter @tollbooth/dashboard dev      # http://localhost:3002, click "Explore Live Demo"
 ```
 
-How the demo stays safe (no shared password, read-only, short sessions) is in
-[docs/adr/0007-public-demo-architecture.md](docs/adr/0007-public-demo-architecture.md). Hosting it publicly is
-described in [docs/deployment.md](docs/deployment.md).
+For full architectural details, see [docs/adr/0007-public-demo-architecture.md](docs/adr/0007-public-demo-architecture.md) and [docs/deployment.md](docs/deployment.md).
+
+## Feature Implementation Matrix
+
+| Capability                     | Status                            | Implementation Details                                                                                                                                                            |
+| ------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chat Completions API**       | **Implemented**                   | `POST /v1/chat/completions` compliant with OpenAI request/response format (synchronous mode).                                                                                     |
+| **Streaming (`stream: true`)** | **Planned**                       | Explicitly rejected at DTO layer with `400 Bad Request` (`code: 'streaming_not_supported'`). Server-Sent Events (SSE) proxying planned for future release.                        |
+| **Model Authorization**        | **Implemented & Hardened**        | Exact canonical matching (`isModelPermitted`). Resolves known aliases (`models/*` prefix) and strictly denies substring-based model escalations (e.g. `gpt-4o` vs `gpt-4o-mini`). |
+| **Provider Routing**           | **Implemented (Single-Provider)** | Maps canonical models to provider adapters (Gemini, OpenAI, Anthropic). Retries transient rate limits and timeouts within the resolved provider.                                  |
+| **Cross-Provider Failover**    | **Planned**                       | Automatic cascade to secondary providers upon primary provider outage is planned.                                                                                                 |
+| **Atomic Traffic Control**     | **Implemented**                   | Redis Lua scripts atomically track requests per minute (RPM) and tokens per minute (TPM) per tenant and per key.                                                                  |
+| **Pre-flight Budgeting**       | **Implemented**                   | Reserves worst-case request cost in Redis before calling provider; settles actual cost in PostgreSQL ledger upon completion.                                                      |
+| **Event Pipeline (Kafka)**     | **Implemented (Announcement)**    | Synchronous PostgreSQL recording for request and financial ledger safety; asynchronous fire-and-forget event emission to Kafka (`usage.completed`, `provider.failed`).            |
+| **AI Security Guardrails**     | **Implemented (Heuristics)**      | Python FastAPI microservice scanning for PII (regex + Luhn card validation), jailbreak keywords, and restricted content patterns.                                                 |
+| **Billing & Quota Management** | **Implemented (Internal Quotas)** | Tier quotas, rate limits, and spending guardrails. **External payment gateway processing (e.g. Stripe) is intentionally out of scope.**                                           |
+| **Public Demo Mode**           | **Implemented (Read-Only)**       | Passwordless session creation, flagged demo tenant, synthetic seeded data, strict server-side `DemoPolicyGuard` blocking all mutations.                                           |
 
 ## Architecture
 
@@ -97,7 +118,7 @@ pnpm install
 pnpm --filter "./packages/*" build
 cp .env.example .env                 # set JWT_SECRET (openssl rand -base64 48)
 pnpm infra:up                        # Postgres, Redis, Kafka, Prometheus, Grafana
-pnpm db:migrate && pnpm db:seed      # schema, reference data, and a development tenant
+pnpm db:deploy && pnpm db:seed:reference # deploy committed migrations and reference catalogue
 
 pnpm --filter @tollbooth/gateway dev          # :3000
 pnpm --filter @tollbooth/control-plane dev    # :3001

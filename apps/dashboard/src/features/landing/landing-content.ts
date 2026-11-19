@@ -31,16 +31,18 @@ export const REQUEST_FLOW: FlowStep[] = [
   },
   {
     title: 'Security check',
-    detail: 'A separate service looks for PII, prompt injection and disallowed content.',
+    detail:
+      'A microservice evaluates prompts against rule-based and regex heuristics for PII, injection patterns, and disallowed content.',
   },
   {
     title: 'Provider router',
     detail:
-      'Picks a provider for the model. A circuit breaker shared by every gateway instance keeps calls off a failing one.',
+      'Routes to the target provider adapter (Gemini, OpenAI, Anthropic). A shared circuit breaker prevents requests to failing upstream providers.',
   },
   {
     title: 'Record',
-    detail: 'Usage, cost and a ledger entry are written, and a usage event is published to Kafka.',
+    detail:
+      'Usage, cost and a ledger entry are written synchronously to Postgres, and a usage event is published asynchronously to Kafka.',
   },
 ];
 
@@ -51,12 +53,12 @@ export interface Capability {
 
 export const CAPABILITIES: Capability[] = [
   {
-    title: 'One API for several providers',
-    body: 'An OpenAI-compatible endpoint in front of Gemini, OpenAI and Anthropic. Point an existing OpenAI client at the gateway and change nothing else.',
+    title: 'Unified Chat API for model providers',
+    body: 'Standard OpenAI-compatible chat completions (POST /v1/chat/completions) across Gemini, OpenAI and Anthropic with exact-match model authorization and pre-flight budget reservation (synchronous responses; streaming is planned).',
   },
   {
     title: 'Spend you can cap',
-    body: 'Per-tenant budgets in exact integer micro-dollars, an append-only ledger, and alerts as a budget fills.',
+    body: 'Per-tenant budget guardrails in exact integer micro-dollars, an append-only usage ledger, and alerts as spending thresholds are crossed.',
   },
   {
     title: 'Multi-tenant by construction',
